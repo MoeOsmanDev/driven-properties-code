@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 interface InputTextProps {
   id: string;
@@ -10,59 +10,10 @@ interface InputTextProps {
   autoComplete?: string;
 }
 
-/**
- * Text input component for form fields
- *
- * This component provides a controlled text input with immediate value
- * commitment and comprehensive styling. It's designed for use within
- * the FormField system and provides:
- * - Immediate value updates as the user types
- * - Value commitment on blur for better UX
- * - Error state styling with visual indicators
- * - Accessibility features (labels, autoComplete)
- * - Responsive design with Tailwind CSS
- *
- * The component uses a controlled input pattern where the internal
- * state is managed locally but changes are immediately propagated
- * to the parent form via the onCommit callback.
- *
- * @param props - Component properties
- * @param props.id - Unique identifier for the input field
- * @param props.defaultValue - Initial value for the input field
- * @param props.onCommit - Callback function called when value changes or field loses focus
- * @param props.placeholder - Placeholder text displayed when field is empty
- * @param props.autoComplete - HTML autocomplete attribute value
- * @param props.error - Whether to display error styling
- *
- * @example
- * ```typescript
- * <InputText
- *   id="firstName"
- *   defaultValue="John"
- *   onCommit={(value) => updateField('firstName', value)}
- *   placeholder="Enter your first name"
- *   autoComplete="given-name"
- *   error={Boolean(errors.firstName)}
- * />
- * ```
- *
- * @example
- * ```typescript
- * // Email field with email autocomplete
- * <InputText
- *   id="email"
- *   defaultValue=""
- *   onCommit={(value) => updateField('email', value)}
- *   placeholder="Enter your email address"
- *   autoComplete="email"
- *   error={Boolean(errors.email)}
- * />
- * ```
- */
 export const InputText: React.FC<InputTextProps> = React.memo(
   ({ id, defaultValue = '', onCommit, placeholder, autoComplete = 'off' }) => {
     /** Internal state for the input value */
-    const [inputValue, setInputValue] = React.useState(defaultValue);
+    const [inputValue, setInputValue] = useState(defaultValue);
 
     /**
      * Handles input value changes
