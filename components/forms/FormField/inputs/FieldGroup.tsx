@@ -62,30 +62,28 @@ interface FieldGroupProps {
  * />
  * ```
  */
-export const FieldGroup: React.FC<FieldGroupProps> = ({
-  label,
-  fields,
-  formData,
-  onUpdate,
-  parentPath,
-}) => {
-  return (
-    <div className='space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50'>
-      {/* Group header */}
-      <h3 className='text-lg font-medium text-gray-900'>{label}</h3>
+export const FieldGroup: React.FC<FieldGroupProps> = React.memo(
+  ({ label, fields, formData, onUpdate, parentPath }) => {
+    return (
+      <div className='space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50'>
+        {/* Group header */}
+        <h3 className='text-lg font-medium text-gray-900'>{label}</h3>
 
-      {/* Grouped fields */}
-      <div className='space-y-4'>
-        {fields.map(field => (
-          <FormField
-            key={field.key}
-            field={field}
-            formData={formData}
-            onUpdate={onUpdate}
-            parentPath={parentPath}
-          />
-        ))}
+        {/* Grouped fields */}
+        <div className='space-y-4'>
+          {fields.map(field => (
+            <FormField
+              key={field.key}
+              field={field}
+              formData={formData}
+              onUpdate={onUpdate}
+              parentPath={parentPath}
+            />
+          ))}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
+
+FieldGroup.displayName = 'FieldGroup';

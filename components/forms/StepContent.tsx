@@ -1,5 +1,5 @@
 import { FormData, FormStep } from '@/lib/types';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FormField } from './FormField/FormField';
 
 interface StepContentProps {
@@ -40,36 +40,38 @@ interface StepContentProps {
  * />
  * ```
  */
-export const StepContent: React.FC<StepContentProps> = ({
-  currentStepData,
-  currentStep,
-  totalSteps,
-  formData,
-  updateField,
-}) => {
-  return (
-    <div className='space-y-8'>
-      {/* Step header with title and progress indicator */}
-      <div className='text-center'>
-        <h2 className='text-2xl font-bold text-gray-900 mb-2'>
-          {currentStepData.title}
-        </h2>
-        <p className='text-gray-600'>
-          Step {currentStep + 1} of {totalSteps - 1}
-        </p>
-      </div>
-
-      {/* Form fields for the current step */}
-      <div className='space-y-6'>
-        {currentStepData.fields.map(field => (
+export const StepContent: React.FC<StepContentProps> = React.memo(
+  ({ currentStepData, currentStep, totalSteps, formData, updateField }) => {
+    const memoizedFields = useMemo(
+      () =>
+        currentStepData.fields.map(field => (
           <FormField
             key={field.key}
             field={field}
             formData={formData}
             onUpdate={updateField}
           />
-        ))}
+        )),
+      [currentStepData.fields, formData, updateField]
+    );
+
+    return (
+      <div className='space-y-8'>
+        {/* Step header with title and progress indicator */}
+        <div className='text-center'>
+          <h2 className='text-2xl font-bold text-gray-900 mb-2'>
+            {currentStepData.title}
+          </h2>
+          <p className='text-gray-600'>
+            Step {currentStep + 1} of {totalSteps - 1}
+          </p>
+        </div>
+
+        {/* Form fields for the current step */}
+        <div className='space-y-6'>{memoizedFields}</div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
+
+StepContent.displayName = 'StepContent';
