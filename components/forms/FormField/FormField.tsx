@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 
 import { FieldGroup } from './inputs/FieldGroup';
 import { InputCheckbox } from './inputs/InputCheckbox';
@@ -102,9 +102,9 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
     };
 
     /* -------------------------
-       5. Field rendering logic
-    ------------------------- */
-    const renderField = useMemo(() => {
+         7. Render field based on type
+     ------------------------- */
+    const renderField = (() => {
       switch (field.type) {
         case 'text':
           return (
@@ -185,19 +185,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
         default:
           return <UnsupportedField type={field.type as string} />;
       }
-    }, [
-      field.type,
-      fieldPath,
-      value,
-      field.label,
-      field.key,
-      fieldOptions,
-      field.fields,
-      formData,
-      onUpdate,
-      parentPath,
-      handleChange,
-    ]);
+    })();
 
     /* -------------------------
        6. Render wrapper

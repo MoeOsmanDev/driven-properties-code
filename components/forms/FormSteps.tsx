@@ -29,7 +29,7 @@ export const FormSteps: React.FC<FormStepsProps> = React.memo(
                 {/* Step indicator */}
                 <div
                   className={cn(
-                    'flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition-all duration-200',
+                    'flex flex-shrink-0 h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition-all duration-200',
                     currentStep > index
                       ? 'border-blue-600 bg-blue-600 text-white'
                       : currentStep === index

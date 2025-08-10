@@ -25,10 +25,13 @@ export const MultiStepForm: React.FC = () => {
   } = useMultiStepForm(rawFormSchema as FormSchema);
 
   const formSchema = rawFormSchema as FormSchema;
+
+  // Only memoize expensive computations that don't change frequently
   const currentStepData = useMemo(
     () => formSchema.steps[currentStep],
-    [formSchema.steps, currentStep]
+    [currentStep] // formSchema.steps is static, so we don't need it in deps
   );
+
   const isReviewStep = useMemo(
     () => currentStep === totalSteps - 1,
     [currentStep, totalSteps]
@@ -36,6 +39,7 @@ export const MultiStepForm: React.FC = () => {
 
   const [direction, setDirection] = useState(0);
 
+  // Only use useCallback for functions passed to memoized child components
   const handleNext = useCallback(async () => {
     setDirection(1);
     return await nextStep();
@@ -55,57 +59,11 @@ export const MultiStepForm: React.FC = () => {
 
   console.log('page rendered');
 
-  const memoizedFormSteps = useMemo(
-    () => <FormSteps steps={formSchema.steps} currentStep={currentStep} />,
-    [formSchema.steps, currentStep]
-  );
-
-  const memoizedStepContent = useMemo(
-    () => (
-      <StepContent
-        currentStepData={currentStepData}
-        currentStep={currentStep}
-        totalSteps={totalSteps}
-        formData={formData}
-        updateField={handleUpdateField}
-      />
-    ),
-    [currentStepData, currentStep, totalSteps, formData, handleUpdateField]
-  );
-
-  const memoizedReviewStep = useMemo(
-    () => <ReviewStep formSchema={formSchema} formData={formData} />,
-    [formSchema, formData]
-  );
-
-  const memoizedFormNavigation = useMemo(
-    () => (
-      <FormNavigation
-        currentStep={currentStep}
-        totalSteps={totalSteps}
-        canGoNext={canGoNext}
-        canGoPrev={canGoPrev}
-        onPrev={handlePrev}
-        onNext={handleNext}
-        onSubmit={submitForm}
-      />
-    ),
-    [
-      currentStep,
-      totalSteps,
-      canGoNext,
-      canGoPrev,
-      handlePrev,
-      handleNext,
-      submitForm,
-    ]
-  );
-
   return (
     <div className='w-full max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden'>
       {/* Steps Header */}
       <div className='px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 bg-gradient-to-r from-cyan-400 via-cyan-700 to-cyan-700'>
-        {memoizedFormSteps}
+        <FormSteps steps={formSchema.steps} currentStep={currentStep} />
       </div>
 
       {/* Form Content */}
@@ -124,12 +82,30 @@ export const MultiStepForm: React.FC = () => {
             }}
             className='min-h-[300px] sm:min-h-[350px] md:min-h-[400px]'
           >
-            {isReviewStep ? memoizedReviewStep : memoizedStepContent}
+            {isReviewStep ? (
+              <ReviewStep formSchema={formSchema} formData={formData} />
+            ) : (
+              <StepContent
+                currentStepData={currentStepData}
+                currentStep={currentStep}
+                totalSteps={totalSteps}
+                formData={formData}
+                updateField={handleUpdateField}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
 
         {/* Navigation */}
-        {memoizedFormNavigation}
+        <FormNavigation
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          canGoNext={canGoNext}
+          canGoPrev={canGoPrev}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onSubmit={submitForm}
+        />
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { FormData, FormStep } from '@/lib/types';
-import React, { useMemo } from 'react';
+import React from 'react';
 import { FormField } from './FormField/FormField';
 
 interface StepContentProps {
@@ -42,19 +42,6 @@ interface StepContentProps {
  */
 export const StepContent: React.FC<StepContentProps> = React.memo(
   ({ currentStepData, currentStep, totalSteps, formData, updateField }) => {
-    const memoizedFields = useMemo(
-      () =>
-        currentStepData.fields.map(field => (
-          <FormField
-            key={field.key}
-            field={field}
-            formData={formData}
-            onUpdate={updateField}
-          />
-        )),
-      [currentStepData.fields, formData, updateField]
-    );
-
     return (
       <div className='space-y-8'>
         {/* Step header with title and progress indicator */}
@@ -68,7 +55,16 @@ export const StepContent: React.FC<StepContentProps> = React.memo(
         </div>
 
         {/* Form fields for the current step */}
-        <div className='space-y-6'>{memoizedFields}</div>
+        <div className='space-y-6'>
+          {currentStepData.fields.map(field => (
+            <FormField
+              key={field.key}
+              field={field}
+              formData={formData}
+              onUpdate={updateField}
+            />
+          ))}
+        </div>
       </div>
     );
   }

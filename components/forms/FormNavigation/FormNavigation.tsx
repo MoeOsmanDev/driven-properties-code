@@ -38,8 +38,8 @@ export const FormNavigation: React.FC<FormNavigationProps> = React.memo(
       }
     }, [isLastStep, onSubmit, onNext]);
 
-    const memoizedPrevButton = useMemo(
-      () => (
+    return (
+      <div className='flex items-center justify-between pt-8 border-t border-gray-200'>
         <Button
           type='button'
           variant='outline'
@@ -50,12 +50,11 @@ export const FormNavigation: React.FC<FormNavigationProps> = React.memo(
           <PrevIcon />
           Previous
         </Button>
-      ),
-      [onPrev, canGoPrev, isLoading, isNavigating]
-    );
 
-    const memoizedNextButton = useMemo(
-      () => (
+        <div className='flex items-center gap-2 text-sm text-gray-500'>
+          Step {currentStep + 1} of {totalSteps}
+        </div>
+
         <Button
           type='button'
           onClick={handleNext}
@@ -77,19 +76,6 @@ export const FormNavigation: React.FC<FormNavigationProps> = React.memo(
             </>
           )}
         </Button>
-      ),
-      [handleNext, canGoNext, isLastStep, isLoading, isNavigating]
-    );
-
-    return (
-      <div className='flex items-center justify-between pt-8 border-t border-gray-200'>
-        {memoizedPrevButton}
-
-        <div className='flex items-center gap-2 text-sm text-gray-500'>
-          Step {currentStep + 1} of {totalSteps}
-        </div>
-
-        {memoizedNextButton}
       </div>
     );
   }
