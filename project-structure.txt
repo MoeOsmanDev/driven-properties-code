@@ -2,11 +2,8 @@
 │   ├── components
 │   ├── hooks
 │   └── lib
-│       └── validation.test.ts
+├── .git
 ├── .next
-├── .swc
-│   └── plugins
-│       └── v7_windows_x86_64_17.0.0
 ├── app
 │   ├── favicon.ico
 │   ├── globals.css
@@ -47,10 +44,8 @@
 ├── jest.setup.js
 ├── lib
 │   ├── form-schema.json
-│   ├── schema-validator.ts
 │   ├── types.ts
-│   ├── utils.ts
-│   └── validation.ts
+│   └── utils.ts
 ├── next-env.d.ts
 ├── next.config.ts
 ├── node_modules
@@ -73,5 +68,4 @@
 ├── tailwind.config.js
 ├── tsconfig.json
 ├── tsconfig.scripts.json
-└── validations
-    └── form-schemas.ts
+└── tsconfig.tsbuildinfo

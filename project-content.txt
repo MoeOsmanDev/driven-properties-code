@@ -77,17 +77,27 @@ import { MultiStepForm } from '@/components/forms/MultiStepForm';
 
 export default function Home() {
   return (
-    <div className='w-full min-h-screen px-3 sm:px-4 py-6 sm:py-8 bg-gradient-to-br from-cyan-700 via-cyan-100 to-slate-900'>
-      <div className='w-full max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto'>
-        <div className='text-center mb-6 sm:mb-8'>
-          <h1 className='text-2xl sm:text-3xl font-bold text-gray-900 mb-2'>
-            Property Registration
-          </h1>
-          <p className='text-sm sm:text-base text-gray-700'>
-            Complete your property registration in a few simple steps
-          </p>
+    <div className='min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 relative overflow-hidden'>
+      {/* Background decorative elements */}
+      <div className='absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-400/20 via-transparent to-transparent'></div>
+      <div className='absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-500/30 to-cyan-400/20 rounded-full blur-3xl'></div>
+      <div className='absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-indigo-500/20 to-blue-400/10 rounded-full blur-3xl'></div>
+
+      <div className='relative w-full min-h-screen px-3 sm:px-4 py-6 sm:py-8'>
+        <div className='w-full max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto'>
+          <div className='text-center mb-8 sm:mb-12'>
+            <h1 className='text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-white via-blue-100 to-cyan-200 bg-clip-text text-transparent mb-4 tracking-tight'>
+              Property Registration
+            </h1>
+            <p className='text-base sm:text-lg text-blue-100/80 max-w-2xl mx-auto leading-relaxed'>
+              Complete your property registration in a few simple steps with our
+              modern, secure platform
+            </p>
+            {/* Decorative line */}
+            <div className='w-24 h-1 bg-gradient-to-r from-blue-400 to-cyan-400 mx-auto mt-6 rounded-full'></div>
+          </div>
+          <MultiStepForm />
         </div>
-        <MultiStepForm />
       </div>
     </div>
   );
@@ -121,7 +131,6 @@ export const slideVariants = {
 'use client';
 
 import React from 'react';
-import { SchemaValidator } from '../../../lib/schema-validator';
 
 import { FieldGroup } from './inputs/FieldGroup';
 import { InputCheckbox } from './inputs/InputCheckbox';
@@ -132,269 +141,208 @@ import { InputSelect } from './inputs/InputSelect';
 import { InputText } from './inputs/InputText';
 import { UnsupportedField } from './UnsupportedField';
 
+import { FormField as FormFieldType } from '@/lib/types';
 import { FormFieldProps } from './types';
 
-/**
- * Dynamic form field component that renders different input types based on field schema
- *
- * This component is the core building block of the form system, responsible for:
- * - Rendering appropriate input components based on field type
- * - Handling field visibility based on dependencies
- * - Managing field value retrieval and updates
- * - Displaying validation errors
- * - Supporting nested field structures (groups)
- *
- * The component automatically determines which input component to render based on
- * the field.type property and provides consistent error handling and styling.
- *
- * @param props - Component properties
- * @param props.field - Field schema defining the input type, validation, and display options
- * @param props.formData - Current form data for value retrieval and dependency evaluation
- * @param props.onUpdate - Callback function called when field value changes
- * @param props.errors - Validation errors object mapping field paths to error messages
- * @param props.parentPath - Optional parent path for nested fields (e.g., 'address.city')
- *
- * @example
- * ```typescript
- * <FormField
- *   field={{
- *     key: 'firstName',
- *     label: 'First Name',
- *     type: 'text',
- *     required: true
- *   }}
- *   formData={formData}
- *   onUpdate={updateField}
- *   errors={errors}
- * />
- * ```
- *
- * @example
- * ```typescript
- * // Nested field example
- * <FormField
- *   field={{
- *     key: 'address',
- *     label: 'Address',
- *     type: 'group',
- *     fields: [
- *       { key: 'street', label: 'Street', type: 'text', required: true },
- *       { key: 'city', label: 'City', type: 'text', required: true }
- *     ]
- *   }}
- *   formData={formData}
- *   onUpdate={updateField}
- *   errors={errors}
- *   parentPath="contact"
- * />
- * ```
- */
-export const FormField: React.FC<FormFieldProps> = ({
-  field,
-  formData,
-  onUpdate,
-  errors,
-  parentPath = '',
-}) => {
-  /* -------------------------
-      1. Derived identifiers
-   ------------------------- */
-  /** Full field path including parent path for nested fields */
-  const fieldPath = parentPath ? `${parentPath}.${field.key}` : field.key;
+export const FormField: React.FC<FormFieldProps> = React.memo(
+  ({ field, formData, onUpdate, parentPath = '' }) => {
+    /* -------------------------
+        1. Derived identifiers
+     ------------------------- */
+    const fieldPath = parentPath ? `${parentPath}.${field.key}` : field.key;
 
-  /* -------------------------
-       2. Field visibility & options
-   ------------------------- */
-  /** Whether the field should be visible based on dependencies */
-  const isVisible = SchemaValidator.isFieldVisible(field, formData);
+    /* -------------------------
+         2. Get field value
+     ------------------------- */
+    const getValue = (path: string) => {
+      return path.split('.').reduce((current, key) => current?.[key], formData);
+    };
 
-  /** Available options for select/radio fields */
-  const fieldOptions = SchemaValidator.getFieldOptions(field, formData);
+    const value = getValue(fieldPath);
 
-  /* -------------------------
-       3. Get field value & error
-   ------------------------- */
-  /**
-   * Retrieves nested values from form data using dot notation
-   *
-   * @param path - Dot-notation path (e.g., 'address.city')
-   * @returns The value at the specified path, or undefined if not found
-   */
-  const getValue = (path: string) => {
-    if (!formData || typeof formData !== 'object') {
-      return undefined;
-    }
-    return path.split('.').reduce((current, key) => {
-      if (current && typeof current === 'object' && key in current) {
-        return current[key];
+    /* -------------------------
+         3. Field options
+     ------------------------- */
+    const fieldOptions = (() => {
+      // If field has static options, use them
+      if (field.options) {
+        return field.options;
       }
-      return undefined;
-    }, formData);
-  };
 
-  /** Current value of the field */
-  const value = getValue(fieldPath);
-  /** Validation error for the field, if any */
-  const error =
-    errors && typeof errors === 'object' ? errors[fieldPath] : undefined;
+      // If field has optionSource, get options based on dependency value
+      if (field.optionSource) {
+        const dependencyValue = getValue(field.optionSource.key);
+        dependencyValue;
 
-  /* -------------------------
-       4. Visibility check
-   ------------------------- */
-  if (!isVisible) return null;
-
-  /* -------------------------
-       5. Change handler
-   ------------------------- */
-  /**
-   * Handles field value changes and notifies parent component
-   * Includes validation to ensure name fields only accept strings
-   *
-   * @param newValue - New value for the field
-   */
-  const handleChange = (newValue: any) => {
-    try {
-      // Ensure text fields always receive string values
-      if (field.type === 'text') {
-        // Convert to string if it's not already
-        if (typeof newValue !== 'string') {
-          newValue = String(newValue);
+        if (
+          dependencyValue &&
+          typeof dependencyValue === 'string' &&
+          field.optionSource.map[dependencyValue]
+        ) {
+          const options = field.optionSource.map[dependencyValue];
+          return options;
         }
+        return [];
       }
 
-      // Call onUpdate only if it's a valid function
-      if (typeof onUpdate === 'function') {
-        onUpdate(fieldPath, newValue);
+      return [];
+    })();
+
+    /* -------------------------
+         4. Field visibility
+     ------------------------- */
+    const isVisible = (() => {
+      // If no dependencies, field is always visible
+      if (!field.dependencies || field.dependencies.length === 0) {
+        return true;
       }
-    } catch (error) {
-      console.error('Error in handleChange:', error);
+
+      // Check all dependencies
+      const dependenciesMet = field.dependencies.every(dep => {
+        if (dep.equals !== undefined) {
+          const depValue = getValue(dep.key);
+          // Safe comparison - check if both values are the same type and value
+          const result = (depValue as any) === (dep.equals as any);
+          return result;
+        }
+        if (dep.notEmpty !== undefined) {
+          const value = getValue(dep.key);
+          // Safe empty check - ensure value exists and is not empty string
+          const result = dep.notEmpty
+            ? value && typeof value === 'string' && value !== ''
+            : true;
+          return result;
+        }
+        return true;
+      });
+
+      return dependenciesMet;
+    })();
+
+    /* -------------------------
+         5. Visibility check
+     ------------------------- */
+    if (!isVisible) return null;
+
+    /* -------------------------
+         6. Change handler
+     ------------------------- */
+    const handleChange = (newValue: any) => {
+      onUpdate(fieldPath, newValue);
+    };
+
+    /* -------------------------
+         7. Render field based on type
+     ------------------------- */
+    const renderField = (() => {
+      switch (field.type) {
+        case 'text':
+          return (
+            <InputText
+              id={fieldPath as string}
+              defaultValue={(typeof value === 'string' ? value : '') as string}
+              onCommit={handleChange as (val: string) => void}
+              placeholder={`Enter ${field.label.toLowerCase()}` as string}
+              autoComplete={(field.key === 'email' ? 'email' : 'off') as string}
+            />
+          );
+
+        case 'number':
+          return (
+            <InputNumber
+              id={fieldPath as string}
+              value={
+                (typeof value === 'number' || typeof value === 'string'
+                  ? value
+                  : '') as string | number
+              }
+              onChange={handleChange as (val: string) => void}
+              placeholder={`Enter ${field.label.toLowerCase()}` as string}
+            />
+          );
+
+        case 'select':
+          return (
+            <InputSelect
+              id={fieldPath as string}
+              value={(typeof value === 'string' ? value : '') as string}
+              options={fieldOptions as string[]}
+              onChange={handleChange as (val: string) => void}
+              placeholder={`Select ${field.label.toLowerCase()}` as string}
+            />
+          );
+
+        case 'checkbox':
+          return (
+            <InputCheckbox
+              id={fieldPath as string}
+              label={field.label as string}
+              checked={Boolean(value) as boolean}
+              onChange={handleChange as (val: boolean) => void}
+            />
+          );
+
+        case 'radio':
+          return (
+            <InputRadio
+              name={fieldPath as string}
+              selectedValue={(typeof value === 'string' ? value : '') as string}
+              options={fieldOptions as string[]}
+              onChange={handleChange as (val: string) => void}
+            />
+          );
+
+        case 'date':
+          return (
+            <InputDate
+              id={fieldPath as string}
+              value={(typeof value === 'string' ? value : '') as string}
+              onChange={handleChange as (val: string) => void}
+            />
+          );
+
+        case 'group':
+          return (
+            <FieldGroup
+              label={field.label as string}
+              fields={(field.fields ?? []) as FormFieldType[]}
+              formData={formData as FormData}
+              onUpdate={onUpdate as (key: string, value: any) => void}
+              parentPath={fieldPath as string}
+            />
+          );
+
+        default:
+          return <UnsupportedField type={field.type as string} />;
+      }
+    })();
+
+    /* -------------------------
+       6. Render wrapper
+    ------------------------- */
+    if (field.type === 'group') {
+      return <div className='space-y-4'>{renderField}</div>;
     }
-  };
 
-  /* -------------------------
-       6. Field rendering logic
-   ------------------------- */
-  /**
-   * Renders the appropriate input component based on field type
-   *
-   * Each field type has its own specialized input component with
-   * appropriate props and validation handling.
-   *
-   * @returns React element representing the input field
-   */
-  const renderField = () => {
-    switch (field.type) {
-      case 'text':
-        return (
-          <InputText
-            id={fieldPath}
-            defaultValue={typeof value === 'string' ? value : ''}
-            onCommit={handleChange}
-            placeholder={`Enter ${field.label.toLowerCase()}`}
-            autoComplete={field.key === 'email' ? 'email' : 'off'}
-            error={Boolean(error)}
-          />
-        );
+    return (
+      <div className='space-y-2'>
+        {field.type !== 'checkbox' && (
+          <label
+            htmlFor={fieldPath}
+            className='block text-sm font-medium leading-6 text-gray-900'
+          >
+            {field.label}
+            {field.required && <span className='text-red-500 ml-1'>*</span>}
+          </label>
+        )}
 
-      case 'number':
-        return (
-          <InputNumber
-            id={fieldPath}
-            value={
-              typeof value === 'number' || typeof value === 'string'
-                ? value
-                : ''
-            }
-            onChange={handleChange}
-            placeholder={`Enter ${field.label.toLowerCase()}`}
-            error={Boolean(error)}
-          />
-        );
-
-      case 'select':
-        return (
-          <InputSelect
-            id={fieldPath}
-            value={typeof value === 'string' ? value : ''}
-            options={fieldOptions}
-            onChange={handleChange}
-            placeholder={`Select ${field.label.toLowerCase()}`}
-            error={Boolean(error)}
-          />
-        );
-
-      case 'checkbox':
-        return (
-          <InputCheckbox
-            id={fieldPath}
-            label={field.label}
-            checked={Boolean(value)}
-            onChange={handleChange}
-          />
-        );
-
-      case 'radio':
-        return (
-          <InputRadio
-            name={fieldPath}
-            selectedValue={typeof value === 'string' ? value : ''}
-            options={fieldOptions}
-            onChange={handleChange}
-          />
-        );
-
-      case 'date':
-        return (
-          <InputDate
-            id={fieldPath}
-            value={typeof value === 'string' ? value : ''}
-            onChange={handleChange}
-            error={Boolean(error)}
-          />
-        );
-
-      case 'group':
-        return (
-          <FieldGroup
-            label={field.label}
-            fields={field.fields ?? []}
-            formData={formData}
-            onUpdate={onUpdate}
-            errors={errors}
-            parentPath={fieldPath}
-          />
-        );
-
-      default:
-        return <UnsupportedField type={field.type} />;
-    }
-  };
-
-  /* -------------------------
-       7. Render wrapper
-   ------------------------- */
-  if (field.type === 'group') {
-    return <div className='space-y-4'>{renderField()}</div>;
+        {renderField}
+      </div>
+    );
   }
+);
 
-  return (
-    <div className='space-y-2'>
-      {field.type !== 'checkbox' && (
-        <label
-          htmlFor={fieldPath}
-          className='block text-sm font-medium leading-6 text-gray-900'
-        >
-          {field.label}
-          {field.required && <span className='text-red-500 ml-1'>*</span>}
-        </label>
-      )}
-
-      {renderField()}
-
-      {error && <p className='text-sm text-red-600'>{error}</p>}
-    </div>
-  );
-};
+FormField.displayName = 'FormField';
 
 
 
@@ -411,92 +359,34 @@ interface FieldGroupProps {
   fields: FormFieldType[];
   formData: FormData;
   onUpdate: (key: string, value: any) => void;
-  errors: Record<string, string>;
   parentPath?: string;
 }
 
-/**
- * Container component for grouping related form fields together
- *
- * This component creates a visual and logical grouping of form fields,
- * typically used for related information like address details, contact
- * information, or any set of fields that belong together. It provides:
- * - A clear visual boundary with background and border styling
- * - A group label to identify the purpose of the contained fields
- * - Proper spacing and layout for grouped fields
- * - Nested field path management for form data structure
- *
- * The component automatically handles nested field paths by prepending
- * the group key to child field keys (e.g., 'address.street', 'address.city').
- *
- * @param props - Component properties
- * @param props.label - Human-readable label for the field group
- * @param props.fields - Array of form fields to render within the group
- * @param props.formData - Current form data for field values and validation
- * @param props.onUpdate - Function to update field values
- * @param props.errors - Validation errors for display
- * @param props.parentPath - Optional parent path for nested field structure
- *
- * @example
- * ```typescript
- * <FieldGroup
- *   label="Address Information"
- *   fields={[
- *     { key: 'street', label: 'Street', type: 'text', required: true },
- *     { key: 'city', label: 'City', type: 'text', required: true },
- *     { key: 'zipCode', label: 'ZIP Code', type: 'text', required: true }
- *   ]}
- *   formData={formData}
- *   onUpdate={updateField}
- *   errors={errors}
- *   parentPath="contact"
- * />
- * ```
- *
- * @example
- * ```typescript
- * // Without parent path (top-level group)
- * <FieldGroup
- *   label="Personal Details"
- *   fields={[
- *     { key: 'firstName', label: 'First Name', type: 'text', required: true },
- *     { key: 'lastName', label: 'Last Name', type: 'text', required: true }
- *   ]}
- *   formData={formData}
- *   onUpdate={updateField}
- *   errors={errors}
- * />
- * ```
- */
-export const FieldGroup: React.FC<FieldGroupProps> = ({
-  label,
-  fields,
-  formData,
-  onUpdate,
-  errors,
-  parentPath,
-}) => {
-  return (
-    <div className='space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50'>
-      {/* Group header */}
-      <h3 className='text-lg font-medium text-gray-900'>{label}</h3>
+export const FieldGroup: React.FC<FieldGroupProps> = React.memo(
+  ({ label, fields, formData, onUpdate, parentPath }) => {
+    return (
+      <div className='space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50'>
+        {/* Group header */}
+        <h3 className='text-lg font-medium text-gray-900'>{label}</h3>
 
-      {/* Grouped fields */}
-      <div className='space-y-4'>
-        {fields.map(field => (
-          <FormField
-            key={field.key}
-            field={field}
-            formData={formData}
-            onUpdate={onUpdate}
-            errors={errors}
-            parentPath={parentPath}
-          />
-        ))}
+        {/* Grouped fields */}
+        <div className='space-y-4'>
+          {fields.map(field => (
+            <FormField
+              key={field.key}
+              field={field}
+              formData={formData}
+              onUpdate={onUpdate}
+              parentPath={parentPath}
+            />
+          ))}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
+
+FieldGroup.displayName = 'FieldGroup';
 
 
 
@@ -504,43 +394,42 @@ export const FieldGroup: React.FC<FieldGroupProps> = ({
 
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 
 interface InputCheckboxProps {
   id: string;
   label: string;
   checked: boolean;
-  onChange: (checked: boolean) => void;
+  onChange: (value: boolean) => void;
 }
 
-export const InputCheckbox: React.FC<InputCheckboxProps> = ({
-  id,
-  label,
-  checked,
-  onChange,
-}) => {
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(event.target.checked);
-  };
+export const InputCheckbox: React.FC<InputCheckboxProps> = React.memo(
+  ({ id, label, checked, onChange }) => {
+    const handleChange = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(event.target.checked);
+      },
+      [onChange]
+    );
 
-  return (
-    <div className='flex items-center'>
-      <input
-        type='checkbox'
-        id={id}
-        checked={checked}
-        onChange={handleChange}
-        className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
-      />
-      <label
-        htmlFor={id}
-        className='ml-2 block text-sm text-gray-900 cursor-pointer'
-      >
-        {label}
-      </label>
-    </div>
-  );
-};
+    return (
+      <div className='flex items-center'>
+        <input
+          type='checkbox'
+          id={id}
+          checked={checked}
+          onChange={handleChange}
+          className='h-4 w-4 text-cyan-600 focus:ring-cyan-600 border-gray-300 rounded'
+        />
+        <label htmlFor={id} className='ml-2 block text-sm text-gray-900'>
+          {label}
+        </label>
+      </div>
+    );
+  }
+);
+
+InputCheckbox.displayName = 'InputCheckbox';
 
 
 
@@ -548,37 +437,36 @@ export const InputCheckbox: React.FC<InputCheckboxProps> = ({
 
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 
 interface InputDateProps {
   id: string;
   value: string;
   onChange: (value: string) => void;
-  error?: boolean;
 }
 
-export const InputDate: React.FC<InputDateProps> = ({
-  id,
-  value,
-  onChange,
-  error,
-}) => {
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(event.target.value);
-  };
+export const InputDate: React.FC<InputDateProps> = React.memo(
+  ({ id, value, onChange }) => {
+    const handleChange = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(event.target.value);
+      },
+      [onChange]
+    );
 
-  return (
-    <input
-      type='date'
-      id={id}
-      value={value}
-      onChange={handleChange}
-      className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 ${
-        error ? 'ring-red-500 focus:ring-red-500' : ''
-      }`}
-    />
-  );
-};
+    return (
+      <input
+        type='date'
+        id={id}
+        value={value}
+        onChange={handleChange}
+        className='block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-2 focus:ring-2 focus:ring-inset focus:ring-cyan-600 sm:text-sm sm:leading-6'
+      />
+    );
+  }
+);
+
+InputDate.displayName = 'InputDate';
 
 
 
@@ -586,40 +474,38 @@ export const InputDate: React.FC<InputDateProps> = ({
 
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 
 interface InputNumberProps {
   id: string;
   value: string | number;
   onChange: (value: string) => void;
   placeholder?: string;
-  error?: boolean;
 }
 
-export const InputNumber: React.FC<InputNumberProps> = ({
-  id,
-  value,
-  onChange,
-  placeholder,
-  error,
-}) => {
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(event.target.value);
-  };
+export const InputNumber: React.FC<InputNumberProps> = React.memo(
+  ({ id, value, onChange, placeholder }) => {
+    const handleChange = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(event.target.value);
+      },
+      [onChange]
+    );
 
-  return (
-    <input
-      type='number'
-      id={id}
-      value={value}
-      onChange={handleChange}
-      placeholder={placeholder}
-      className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-2 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 ${
-        error ? 'ring-red-500 focus:ring-red-500' : ''
-      }`}
-    />
-  );
-};
+    return (
+      <input
+        type='number'
+        id={id}
+        value={value}
+        onChange={handleChange}
+        placeholder={placeholder}
+        className='block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-2 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-cyan-600 sm:text-sm sm:leading-6'
+      />
+    );
+  }
+);
+
+InputNumber.displayName = 'InputNumber';
 
 
 
@@ -627,7 +513,7 @@ export const InputNumber: React.FC<InputNumberProps> = ({
 
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 
 interface InputRadioProps {
   name: string;
@@ -636,40 +522,42 @@ interface InputRadioProps {
   onChange: (value: string) => void;
 }
 
-export const InputRadio: React.FC<InputRadioProps> = ({
-  name,
-  selectedValue,
-  options,
-  onChange,
-}) => {
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(event.target.value);
-  };
+export const InputRadio: React.FC<InputRadioProps> = React.memo(
+  ({ name, selectedValue, options, onChange }) => {
+    const handleChange = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(event.target.value);
+      },
+      [onChange]
+    );
 
-  return (
-    <div className='space-y-2'>
-      {options.map(option => (
-        <div key={option} className='flex items-center'>
-          <input
-            type='radio'
-            id={`${name}-${option}`}
-            name={name}
-            value={option}
-            checked={selectedValue === option}
-            onChange={handleChange}
-            className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300'
-          />
-          <label
-            htmlFor={`${name}-${option}`}
-            className='ml-2 block text-sm text-gray-900 cursor-pointer'
-          >
-            {option}
-          </label>
-        </div>
-      ))}
-    </div>
-  );
-};
+    return (
+      <div className='space-y-2'>
+        {options.map(option => (
+          <div key={option} className='flex items-center'>
+            <input
+              type='radio'
+              id={`${name}-${option}`}
+              name={name}
+              value={option}
+              checked={selectedValue === option}
+              onChange={handleChange}
+              className='h-4 w-4 text-cyan-600 focus:ring-cyan-600 border-gray-300'
+            />
+            <label
+              htmlFor={`${name}-${option}`}
+              className='ml-2 block text-sm text-gray-900'
+            >
+              {option}
+            </label>
+          </div>
+        ))}
+      </div>
+    );
+  }
+);
+
+InputRadio.displayName = 'InputRadio';
 
 
 
@@ -677,7 +565,7 @@ export const InputRadio: React.FC<InputRadioProps> = ({
 
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 
 interface InputSelectProps {
   id: string;
@@ -685,43 +573,40 @@ interface InputSelectProps {
   options: string[];
   onChange: (value: string) => void;
   placeholder?: string;
-  error?: boolean;
 }
 
-export const InputSelect: React.FC<InputSelectProps> = ({
-  id,
-  value,
-  options,
-  onChange,
-  placeholder,
-  error,
-}) => {
-  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    onChange(event.target.value);
-  };
+export const InputSelect: React.FC<InputSelectProps> = React.memo(
+  ({ id, value, options, onChange, placeholder }) => {
+    const handleChange = useCallback(
+      (event: React.ChangeEvent<HTMLSelectElement>) => {
+        onChange(event.target.value);
+      },
+      [onChange]
+    );
 
-  return (
-    <select
-      id={id}
-      value={value}
-      onChange={handleChange}
-      className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-1 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 ${
-        error ? 'ring-red-500 focus:ring-red-500' : ''
-      }`}
-    >
-      {placeholder && (
-        <option value='' disabled>
-          {placeholder}
-        </option>
-      )}
-      {options.map(option => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
-  );
-};
+    return (
+      <select
+        id={id}
+        value={value}
+        onChange={handleChange}
+        className='block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-2 focus:ring-2 focus:ring-inset focus:ring-cyan-600 sm:text-sm sm:leading-6'
+      >
+        {placeholder && (
+          <option value='' disabled>
+            {placeholder}
+          </option>
+        )}
+        {options.map(option => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    );
+  }
+);
+
+InputSelect.displayName = 'InputSelect';
 
 
 
@@ -729,7 +614,7 @@ export const InputSelect: React.FC<InputSelectProps> = ({
 
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 interface InputTextProps {
   id: string;
@@ -737,119 +622,68 @@ interface InputTextProps {
   onCommit: (value: string) => void;
   placeholder?: string;
   autoComplete?: string;
-  error?: boolean;
 }
 
-/**
- * Text input component for form fields
- *
- * This component provides a controlled text input with immediate value
- * commitment and comprehensive styling. It's designed for use within
- * the FormField system and provides:
- * - Immediate value updates as the user types
- * - Value commitment on blur for better UX
- * - Error state styling with visual indicators
- * - Accessibility features (labels, autoComplete)
- * - Responsive design with Tailwind CSS
- *
- * The component uses a controlled input pattern where the internal
- * state is managed locally but changes are immediately propagated
- * to the parent form via the onCommit callback.
- *
- * @param props - Component properties
- * @param props.id - Unique identifier for the input field
- * @param props.defaultValue - Initial value for the input field
- * @param props.onCommit - Callback function called when value changes or field loses focus
- * @param props.placeholder - Placeholder text displayed when field is empty
- * @param props.autoComplete - HTML autocomplete attribute value
- * @param props.error - Whether to display error styling
- *
- * @example
- * ```typescript
- * <InputText
- *   id="firstName"
- *   defaultValue="John"
- *   onCommit={(value) => updateField('firstName', value)}
- *   placeholder="Enter your first name"
- *   autoComplete="given-name"
- *   error={Boolean(errors.firstName)}
- * />
- * ```
- *
- * @example
- * ```typescript
- * // Email field with email autocomplete
- * <InputText
- *   id="email"
- *   defaultValue=""
- *   onCommit={(value) => updateField('email', value)}
- *   placeholder="Enter your email address"
- *   autoComplete="email"
- *   error={Boolean(errors.email)}
- * />
- * ```
- */
-export const InputText: React.FC<InputTextProps> = ({
-  id,
-  defaultValue = '',
-  onCommit,
-  placeholder,
-  autoComplete = 'off',
-  error,
-}) => {
-  /** Internal state for the input value */
-  const [inputValue, setInputValue] = React.useState(defaultValue);
+export const InputText: React.FC<InputTextProps> = React.memo(
+  ({ id, defaultValue = '', onCommit, placeholder, autoComplete = 'off' }) => {
+    /** Internal state for the input value */
+    const [inputValue, setInputValue] = useState(defaultValue);
 
-  /**
-   * Handles input value changes
-   *
-   * Updates the internal state and immediately commits the new value
-   * to the parent form for real-time validation and data management.
-   *
-   * @param event - Change event from the input element
-   */
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = event.target.value;
-    setInputValue(newValue);
-    onCommit(newValue); // Immediately commit the value to parent form
-  };
+    /**
+     * Handles input value changes
+     *
+     * Updates the internal state and immediately commits the new value
+     * to the parent form for real-time validation and data management.
+     *
+     * @param event - Change event from the input element
+     */
+    const handleChange = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        const newValue = event.target.value;
+        setInputValue(newValue);
+        onCommit(newValue); // Immediately commit the value to parent form
+      },
+      [onCommit]
+    );
 
-  /**
-   * Handles input blur events
-   *
-   * Commits the current input value when the user leaves the field,
-   * ensuring the final value is captured even if it hasn't changed
-   * since the last keystroke.
-   */
-  const handleBlur = () => {
-    onCommit(inputValue); // Also commit when leaving the field
-  };
+    /**
+     * Handles input blur events
+     *
+     * Commits the current input value when the user leaves the field,
+     * ensuring the final value is captured even if it hasn't changed
+     * since the last keystroke.
+     */
+    const handleBlur = useCallback(() => {
+      onCommit(inputValue); // Also commit when leaving the field
+    }, [onCommit, inputValue]);
 
-  /**
-   * Syncs internal state with external defaultValue changes
-   *
-   * This effect ensures that if the defaultValue prop changes
-   * (e.g., from form reset), the internal state is updated accordingly.
-   */
-  React.useEffect(() => {
-    setInputValue(defaultValue);
-  }, [defaultValue]);
+    /**
+     * Syncs internal state with external defaultValue changes
+     *
+     * This effect ensures that if the defaultValue prop changes
+     * externally (e.g., from form reset or navigation), the internal
+     * state is updated accordingly.
+     */
+    useEffect(() => {
+      setInputValue(defaultValue);
+    }, [defaultValue]);
 
-  return (
-    <input
-      type='text'
-      id={id}
-      value={inputValue}
-      onChange={handleChange}
-      placeholder={placeholder}
-      autoComplete={autoComplete}
-      onBlur={handleBlur}
-      className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-2 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 ${
-        error ? 'ring-red-500 focus:ring-red-500' : ''
-      }`}
-    />
-  );
-};
+    return (
+      <input
+        type='text'
+        id={id}
+        value={inputValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        className='block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-2 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-cyan-600 sm:text-sm sm:leading-6'
+      />
+    );
+  }
+);
+
+InputText.displayName = 'InputText';
 
 
 
@@ -877,7 +711,6 @@ export interface FormFieldProps {
   field: FormFieldType;
   formData: FormData;
   onUpdate: (key: string, value: any) => void;
-  errors: Record<string, string>;
   parentPath?: string;
 }
 
@@ -920,31 +753,35 @@ interface UnsupportedFieldProps {
  * <UnsupportedField type="textarea" />
  * ```
  */
-export const UnsupportedField: React.FC<UnsupportedFieldProps> = ({ type }) => {
-  return (
-    <div className='p-4 bg-yellow-50 border border-yellow-200 rounded-lg'>
-      <div className='flex items-center'>
-        {/* Warning icon */}
-        <svg
-          className='w-5 h-5 text-yellow-600 mr-2'
-          fill='currentColor'
-          viewBox='0 0 20 20'
-        >
-          <path
-            fillRule='evenodd'
-            d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
-            clipRule='evenodd'
-          />
-        </svg>
+export const UnsupportedField: React.FC<UnsupportedFieldProps> = React.memo(
+  ({ type }) => {
+    return (
+      <div className='p-4 bg-yellow-50 border border-yellow-200 rounded-lg'>
+        <div className='flex items-center'>
+          {/* Warning icon */}
+          <svg
+            className='w-5 h-5 text-yellow-600 mr-2'
+            fill='currentColor'
+            viewBox='0 0 20 20'
+          >
+            <path
+              fillRule='evenodd'
+              d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
+              clipRule='evenodd'
+            />
+          </svg>
 
-        {/* Warning message */}
-        <span className='text-sm text-yellow-800'>
-          Field type "{type}" is not supported yet.
-        </span>
+          {/* Warning message */}
+          <span className='text-sm text-yellow-800'>
+            Field type "{type}" is not supported yet.
+          </span>
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
+
+UnsupportedField.displayName = 'UnsupportedField';
 
 
 
@@ -953,80 +790,173 @@ export const UnsupportedField: React.FC<UnsupportedFieldProps> = ({ type }) => {
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { FormNavigationProps } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { NextIcon } from './NextIcon';
 import { PrevIcon } from './PrevIcon';
 import { SpinnerIcon } from './SpinnerIcon';
-import { FormNavigationProps } from './types';
 
-export const FormNavigation: React.FC<FormNavigationProps> = ({
-  currentStep,
-  totalSteps,
-  canGoPrev,
-  canGoNext,
-  onPrev,
-  onNext,
-  onSubmit,
-  isLoading = false,
-}) => {
-  const isLastStep = currentStep === totalSteps - 1;
-  const [isNavigating, setIsNavigating] = React.useState(false);
+export const FormNavigation: React.FC<FormNavigationProps> = React.memo(
+  ({
+    currentStep,
+    totalSteps,
+    canGoPrev,
+    canGoNext,
+    onPrev,
+    onNext,
+    onSubmit,
+    isLoading = false,
+  }) => {
+    const isLastStep = useMemo(
+      () => currentStep === totalSteps - 1,
+      [currentStep, totalSteps]
+    );
+    const [isNavigating, setIsNavigating] = React.useState(false);
 
-  const handleNext = async () => {
-    setIsNavigating(true);
-    try {
-      if (isLastStep) {
-        await onSubmit();
-      } else {
-        await onNext();
+    const handleNext = useCallback(async () => {
+      setIsNavigating(true);
+      try {
+        if (isLastStep) {
+          await onSubmit();
+        } else {
+          await onNext();
+        }
+      } finally {
+        setIsNavigating(false);
       }
-    } finally {
-      setIsNavigating(false);
-    }
-  };
+    }, [isLastStep, onSubmit, onNext]);
 
-  return (
-    <div className='flex items-center justify-between pt-8 border-t border-gray-200'>
-      <Button
-        type='button'
-        variant='outline'
-        onClick={onPrev}
-        disabled={!canGoPrev || isLoading || isNavigating}
-        className='flex items-center gap-2'
-      >
-        <PrevIcon />
-        Previous
-      </Button>
+    return (
+      <div className='pt-8 border-t border-gradient-to-r from-transparent via-gray-200 to-transparent relative'>
+        {/* Decorative line */}
+        <div className='absolute top-0 left-1/2 transform -translate-x-1/2 w-24 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full'></div>
 
-      <div className='flex items-center gap-2 text-sm text-gray-500'>
-        Step {currentStep + 1} of {totalSteps}
+        <div className='flex items-center justify-between pt-2'>
+          {/* Previous Button */}
+          <Button
+            type='button'
+            variant='outline'
+            onClick={onPrev}
+            disabled={!canGoPrev || isLoading || isNavigating}
+            className={cn(
+              'flex items-center gap-3 px-6 py-3 rounded-xl font-semibold transition-all duration-300',
+              'border-2 border-slate-300 hover:border-slate-400',
+              'bg-white hover:bg-slate-50',
+              'text-slate-700 hover:text-slate-800',
+              'shadow-md hover:shadow-lg',
+              'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-slate-300',
+              'group relative overflow-hidden'
+            )}
+          >
+            {/* Button background effect */}
+            <div className='absolute inset-0 bg-gradient-to-r from-slate-50 to-gray-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300'></div>
+
+            <div className='relative z-10 flex items-center gap-3'>
+              <div className='w-5 h-5 transition-transform duration-300 group-hover:-translate-x-0.5'>
+                <PrevIcon />
+              </div>
+              <span>Previous</span>
+            </div>
+          </Button>
+
+          {/* Progress indicator */}
+          <div className='flex flex-col items-center space-y-2'>
+            <div className='flex items-center gap-2 text-sm font-medium text-slate-600'>
+              <span>Step</span>
+              <div className='flex items-center space-x-1'>
+                <span className='inline-flex items-center justify-center w-6 h-6 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold rounded-full shadow-sm'>
+                  {currentStep + 1}
+                </span>
+                <span className='text-slate-400'>of</span>
+                <span className='inline-flex items-center justify-center w-6 h-6 bg-slate-200 text-slate-600 text-xs font-bold rounded-full'>
+                  {totalSteps}
+                </span>
+              </div>
+            </div>
+
+            {/* Mini progress dots */}
+            <div className='flex items-center space-x-1'>
+              {Array.from({ length: totalSteps }).map((_, index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    'w-2 h-2 rounded-full transition-all duration-300',
+                    index <= currentStep
+                      ? 'bg-gradient-to-r from-blue-400 to-cyan-400 shadow-sm'
+                      : 'bg-slate-200'
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Next/Submit Button */}
+          <Button
+            type='button'
+            onClick={handleNext}
+            disabled={(!canGoNext && !isLastStep) || isLoading || isNavigating}
+            className={cn(
+              'flex items-center gap-3 px-6 py-3 rounded-xl font-semibold transition-all duration-300 min-w-[140px]',
+              'shadow-lg hover:shadow-xl',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+              'group relative overflow-hidden',
+              isLastStep
+                ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-2 border-green-500 hover:border-green-600 shadow-green-500/30'
+                : 'bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white border-2 border-blue-500 hover:border-blue-600 shadow-blue-500/30'
+            )}
+          >
+            {/* Button glow effect */}
+            <div
+              className={cn(
+                'absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl',
+                isLastStep
+                  ? 'bg-gradient-to-r from-green-400/20 to-emerald-500/20'
+                  : 'bg-gradient-to-r from-blue-400/20 to-cyan-500/20'
+              )}
+            ></div>
+
+            <div className='relative z-10 flex items-center gap-3'>
+              {isNavigating ? (
+                <>
+                  <div className='w-5 h-5 animate-spin'>
+                    <SpinnerIcon />
+                  </div>
+                  <span>{isLastStep ? 'Submitting...' : 'Processing...'}</span>
+                </>
+              ) : (
+                <>
+                  <span>{isLastStep ? 'Submit' : 'Next'}</span>
+                  {isLastStep ? (
+                    <div className='w-5 h-5'>
+                      <svg
+                        fill='currentColor'
+                        viewBox='0 0 20 20'
+                        className='w-5 h-5'
+                      >
+                        <path
+                          fillRule='evenodd'
+                          d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
+                          clipRule='evenodd'
+                        />
+                      </svg>
+                    </div>
+                  ) : (
+                    <div className='w-5 h-5 transition-transform duration-300 group-hover:translate-x-0.5'>
+                      <NextIcon />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </Button>
+        </div>
       </div>
+    );
+  }
+);
 
-      <Button
-        type='button'
-        onClick={handleNext}
-        disabled={(!canGoNext && !isLastStep) || isLoading || isNavigating}
-        className={cn(
-          'flex items-center gap-2 min-w-[120px]',
-          isLastStep && 'bg-green-600 hover:bg-green-700'
-        )}
-      >
-        {isNavigating ? (
-          <>
-            <SpinnerIcon />
-            {isLastStep ? 'Submitting...' : 'Processing...'}
-          </>
-        ) : (
-          <>
-            {isLastStep ? 'Submit' : 'Next'}
-            {!isLastStep && <NextIcon />}
-          </>
-        )}
-      </Button>
-    </div>
-  );
-};
+FormNavigation.displayName = 'FormNavigation';
 
 
 
@@ -1108,75 +1038,104 @@ interface FormStepsProps {
  * Progress indicator component showing the current step
  * and progress through the multi-step form
  */
-export const FormSteps: React.FC<FormStepsProps> = ({ steps, currentStep }) => {
-  return (
-    <nav aria-label='Progress' className='mb-8'>
-      <ol role='list' className='flex items-center justify-between'>
-        {steps.map((step, index) => (
-          <li
-            key={step.title}
-            className={cn(
-              'flex items-center',
-              index < steps.length - 1 ? 'flex-1' : ''
-            )}
-          >
-            <div className='flex items-center'>
-              {/* Step indicator */}
-              <div
-                className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition-all duration-200',
-                  currentStep > index
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : currentStep === index
-                    ? 'border-blue-600 bg-white text-blue-600'
-                    : 'border-gray-300 bg-white text-black'
-                )}
-              >
-                {currentStep > index ? (
-                  <svg
-                    className='h-5 w-5'
-                    fill='currentColor'
-                    viewBox='0 0 20 20'
-                  >
-                    <path
-                      fillRule='evenodd'
-                      d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
-                      clipRule='evenodd'
-                    />
-                  </svg>
-                ) : (
-                  <span>{index + 1}</span>
-                )}
-              </div>
-
-              {/* Step title */}
-              <div className='ml-4 min-w-0'>
-                <span
+export const FormSteps: React.FC<FormStepsProps> = React.memo(
+  ({ steps, currentStep }) => {
+    return (
+      <nav aria-label='Progress' className='mb-0'>
+        <ol role='list' className='flex items-center justify-between'>
+          {steps.map((step, index) => (
+            <li
+              key={step.title}
+              className={cn(
+                'flex items-center',
+                index < steps.length - 1 ? 'flex-1' : ''
+              )}
+            >
+              <div className='flex items-center'>
+                {/* Enhanced step indicator */}
+                <div
                   className={cn(
-                    'text-sm font-medium transition-colors duration-200',
-                    currentStep >= index ? 'text-black' : 'text-gray-600'
+                    'flex flex-shrink-0 h-12 w-12 items-center justify-center rounded-full text-sm font-bold transition-all duration-300 shadow-lg relative',
+                    currentStep > index
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-blue-500/30 scale-105'
+                      : currentStep === index
+                      ? 'bg-gradient-to-r from-white to-gray-50 text-blue-600 border-2 border-blue-500 shadow-blue-500/20 scale-110'
+                      : 'bg-white/80 text-slate-600 border-2 border-slate-300 shadow-slate-200/50'
                   )}
                 >
-                  {step.title}
-                </span>
-              </div>
-            </div>
+                  {/* Glow effect for active/completed steps */}
+                  {currentStep >= index && (
+                    <div
+                      className={cn(
+                        'absolute inset-0 rounded-full blur-md',
+                        currentStep > index
+                          ? 'bg-gradient-to-r from-blue-400/40 to-cyan-400/40'
+                          : 'bg-blue-400/30'
+                      )}
+                    ></div>
+                  )}
 
-            {/* Connector line */}
-            {index < steps.length - 1 && (
-              <div
-                className={cn(
-                  'ml-4 h-0.5 w-full transition-colors duration-200',
-                  currentStep > index ? 'bg-blue-600' : 'bg-gray-300'
-                )}
-              />
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-};
+                  <div className='relative z-10'>
+                    {currentStep > index ? (
+                      <svg
+                        className='h-6 w-6'
+                        fill='currentColor'
+                        viewBox='0 0 20 20'
+                      >
+                        <path
+                          fillRule='evenodd'
+                          d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
+                          clipRule='evenodd'
+                        />
+                      </svg>
+                    ) : (
+                      <span className='font-bold'>{index + 1}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Enhanced step title */}
+                <div className='ml-4 min-w-0'>
+                  <span
+                    className={cn(
+                      'text-sm font-semibold transition-all duration-300',
+                      currentStep >= index
+                        ? 'text-white drop-shadow-sm'
+                        : 'text-blue-200/70'
+                    )}
+                  >
+                    {step.title}
+                  </span>
+                </div>
+              </div>
+
+              {/* Enhanced connector line */}
+              {index < steps.length - 1 && (
+                <div className='ml-6 flex-1 relative'>
+                  <div
+                    className={cn(
+                      'h-1 w-full transition-all duration-500 rounded-full relative overflow-hidden',
+                      currentStep > index
+                        ? 'bg-gradient-to-r from-blue-400 to-cyan-400 shadow-lg shadow-blue-400/30'
+                        : 'bg-blue-200/30'
+                    )}
+                  >
+                    {/* Animated progress fill */}
+                    {currentStep > index && (
+                      <div className='absolute inset-0 bg-gradient-to-r from-blue-300/50 to-cyan-300/50 animate-pulse'></div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
+    );
+  }
+);
+
+FormSteps.displayName = 'FormSteps';
 
 
 
@@ -1188,7 +1147,7 @@ import { useMultiStepForm } from '@/hooks/useMultiStepForm';
 import rawFormSchema from '@/lib/form-schema.json';
 import { FormSchema } from '@/lib/types';
 import { AnimatePresence, motion } from 'framer-motion';
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { slideVariants } from './animations/slideVariants';
 import { FormNavigation } from './FormNavigation/FormNavigation';
 import { FormSteps } from './FormSteps';
@@ -1200,7 +1159,6 @@ export const MultiStepForm: React.FC = () => {
     currentStep,
     totalSteps,
     formData,
-    errors,
     nextStep,
     prevStep,
     updateField,
@@ -1210,69 +1168,93 @@ export const MultiStepForm: React.FC = () => {
   } = useMultiStepForm(rawFormSchema as FormSchema);
 
   const formSchema = rawFormSchema as FormSchema;
-  const currentStepData = formSchema.steps[currentStep];
-  const isReviewStep = currentStep === totalSteps - 1;
+
+  // Only memoize expensive computations that don't change frequently
+  const currentStepData = useMemo(
+    () => formSchema.steps[currentStep],
+    [currentStep] // formSchema.steps is static, so we don't need it in deps
+  );
+
+  const isReviewStep = useMemo(
+    () => currentStep === totalSteps - 1,
+    [currentStep, totalSteps]
+  );
 
   const [direction, setDirection] = useState(0);
 
-  const handleNext = async () => {
+  // Only use useCallback for functions passed to memoized child components
+  const handleNext = useCallback(async () => {
     setDirection(1);
     return await nextStep();
-  };
+  }, [nextStep]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     setDirection(-1);
     prevStep();
-  };
+  }, [prevStep]);
+
+  // const handleUpdateField = (key: string, value: any) => {
+  //   updateField(key, value);
+  // };
+
+  console.log('page rendered');
 
   return (
-    <div className='w-full max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden'>
-      {/* Steps Header */}
-      <div className='px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 bg-gradient-to-r from-cyan-400 via-cyan-700 to-cyan-700'>
-        <FormSteps steps={formSchema.steps} currentStep={currentStep} />
-      </div>
+    <div className='w-full max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto'>
+      {/* Main form container with glass morphism effect */}
+      <div className='bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden'>
+        {/* Steps Header with enhanced gradient */}
+        <div className='px-4 sm:px-6 md:px-8 py-6 sm:py-7 md:py-8 bg-gradient-to-r from-slate-800 via-blue-900 to-slate-800 relative overflow-hidden'>
+          {/* Subtle pattern overlay */}
+          <div className='absolute inset-0 bg-gradient-to-r from-blue-400/10 to-cyan-400/10'></div>
+          <div className='absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_50%,_rgba(59,130,246,0.15),transparent)]'></div>
 
-      {/* Form Content */}
-      <div className='p-4 sm:p-6 md:p-8'>
-        <AnimatePresence mode='wait' custom={direction}>
-          <motion.div
-            key={currentStep}
-            custom={direction}
-            variants={slideVariants}
-            initial='enter'
-            animate='center'
-            exit='exit'
-            transition={{
-              x: { type: 'spring', stiffness: 300, damping: 30 },
-              opacity: { duration: 0.2 },
-            }}
-            className='min-h-[300px] sm:min-h-[350px] md:min-h-[400px]'
-          >
-            {isReviewStep ? (
-              <ReviewStep formSchema={formSchema} formData={formData} />
-            ) : (
-              <StepContent
-                currentStepData={currentStepData}
-                currentStep={currentStep}
-                totalSteps={totalSteps}
-                formData={formData}
-                updateField={updateField}
-                errors={errors}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
+          <div className='relative'>
+            <FormSteps steps={formSchema.steps} currentStep={currentStep} />
+          </div>
+        </div>
 
-        {/* Navigation */}
-        <FormNavigation
-          currentStep={currentStep}
-          totalSteps={totalSteps}
-          canGoPrev={canGoPrev}
-          canGoNext={canGoNext}
-          onPrev={handlePrev}
-          onNext={handleNext}
-          onSubmit={submitForm}
-        />
+        {/* Form Content with enhanced styling */}
+        <div className='p-4 sm:p-6 md:p-8 lg:p-10 bg-gradient-to-b from-gray-50/50 to-white'>
+          <AnimatePresence mode='wait' custom={direction}>
+            <motion.div
+              key={currentStep}
+              custom={direction}
+              variants={slideVariants}
+              initial='enter'
+              animate='center'
+              exit='exit'
+              transition={{
+                x: { type: 'spring', stiffness: 300, damping: 30 },
+                opacity: { duration: 0.2 },
+              }}
+              className='min-h-[300px] sm:min-h-[350px] md:min-h-[400px]'
+            >
+              {isReviewStep ? (
+                <ReviewStep formSchema={formSchema} formData={formData} />
+              ) : (
+                <StepContent
+                  currentStepData={currentStepData}
+                  currentStep={currentStep}
+                  totalSteps={totalSteps}
+                  formData={formData}
+                  updateField={updateField}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Navigation with modern styling */}
+          <FormNavigation
+            currentStep={currentStep}
+            totalSteps={totalSteps}
+            canGoNext={canGoNext}
+            canGoPrev={canGoPrev}
+            onPrev={handlePrev}
+            onNext={handleNext}
+            onSubmit={submitForm}
+          />
+        </div>
       </div>
     </div>
   );
@@ -1290,106 +1272,165 @@ interface ReviewStepProps {
   formData: Record<string, any>;
 }
 
-export const ReviewStep: React.FC<ReviewStepProps> = ({
-  formSchema,
-  formData,
-}) => (
-  <div className='space-y-8'>
-    <div className='text-center'>
-      <h2 className='text-2xl font-bold text-gray-900 mb-2'>
-        Review Your Information
-      </h2>
-      <p className='text-gray-600'>
-        Please review all the information before submitting
-      </p>
-    </div>
-
-    <div className='bg-white rounded-lg border border-gray-200 overflow-hidden'>
-      {formSchema.steps.slice(0, -1).map((step, stepIndex) => (
-        <div
-          key={stepIndex}
-          className='p-6 border-b border-gray-100 last:border-b-0'
-        >
-          <h3 className='text-lg font-semibold text-gray-900 mb-4'>
-            {step.title}
-          </h3>
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-            {step.fields.map(field => {
-              const renderFieldValue = (field: any, parentPath = '') => {
-                const fieldPath = parentPath
-                  ? `${parentPath}.${field.key}`
-                  : field.key;
-                const value = fieldPath
-                  .split('.')
-                  .reduce(
-                    (current: { [x: string]: any }, key: string | number) =>
-                      current?.[key],
-                    formData
-                  );
-
-                if (field.type === 'group' && field.fields) {
-                  return (
-                    <div key={field.key} className='col-span-full'>
-                      <h4 className='font-medium text-gray-900 mb-2'>
-                        {field.label}
-                      </h4>
-                      <div className='grid grid-cols-1 md:grid-cols-2 gap-2 ml-4'>
-                        {field.fields.map((subField: any) =>
-                          renderFieldValue(subField, fieldPath)
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
-                if (value === undefined || value === null || value === '') {
-                  return null;
-                }
-
-                return (
-                  <div key={fieldPath} className='space-y-1'>
-                    <dt className='text-sm font-medium text-gray-600'>
-                      {field.label}
-                    </dt>
-                    <dd className='text-sm text-gray-900'>
-                      {field.type === 'checkbox'
-                        ? value
-                          ? 'Yes'
-                          : 'No'
-                        : String(value)}
-                    </dd>
-                  </div>
-                );
-              };
-
-              return renderFieldValue(field);
-            })}
-          </div>
+export const ReviewStep: React.FC<ReviewStepProps> = React.memo(
+  ({ formSchema, formData }) => (
+    <div className='space-y-8'>
+      {/* Enhanced header */}
+      <div className='text-center'>
+        <div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full mb-4 shadow-lg shadow-blue-500/30'>
+          <svg
+            className='w-8 h-8 text-white'
+            fill='none'
+            stroke='currentColor'
+            viewBox='0 0 24 24'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth={2}
+              d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+            />
+          </svg>
         </div>
-      ))}
-    </div>
-
-    <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
-      <div className='flex items-center'>
-        <svg
-          className='w-5 h-5 text-blue-600 mr-2'
-          fill='currentColor'
-          viewBox='0 0 20 20'
-        >
-          <path
-            fillRule='evenodd'
-            d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z'
-            clipRule='evenodd'
-          />
-        </svg>
-        <p className='text-sm text-blue-800'>
-          By submitting this form, you confirm that all information provided is
-          accurate and complete.
+        <h2 className='text-3xl font-bold bg-gradient-to-r from-slate-800 to-blue-900 bg-clip-text text-transparent mb-3'>
+          Review Your Information
+        </h2>
+        <p className='text-slate-600 text-lg'>
+          Please review all the information before submitting
         </p>
       </div>
+
+      {/* Enhanced review cards */}
+      <div className='space-y-6'>
+        {formSchema.steps.slice(0, -1).map((step, stepIndex) => (
+          <div
+            key={stepIndex}
+            className='bg-gradient-to-r from-white to-gray-50/50 rounded-xl border border-gray-200/60 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:border-blue-200'
+          >
+            {/* Card header */}
+            <div className='px-6 py-4 bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-gray-100'>
+              <div className='flex items-center'>
+                <div className='flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full mr-3 shadow-md'>
+                  <span className='text-white text-sm font-bold'>
+                    {stepIndex + 1}
+                  </span>
+                </div>
+                <h3 className='text-xl font-bold text-slate-800'>
+                  {step.title}
+                </h3>
+              </div>
+            </div>
+
+            {/* Card content */}
+            <div className='p-6'>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                {step.fields.map(field => {
+                  const renderFieldValue = (field: any, parentPath = '') => {
+                    const fieldPath = parentPath
+                      ? `${parentPath}.${field.key}`
+                      : field.key;
+                    const value = fieldPath
+                      .split('.')
+                      .reduce(
+                        (current: { [x: string]: any }, key: string | number) =>
+                          current?.[key],
+                        formData
+                      );
+
+                    if (field.type === 'group' && field.fields) {
+                      return (
+                        <div key={field.key} className='col-span-full'>
+                          <div className='mb-4 p-4 bg-gradient-to-r from-blue-50/50 to-cyan-50/30 rounded-lg border border-blue-100/50'>
+                            <h4 className='font-bold text-slate-800 mb-3 flex items-center'>
+                              <div className='w-2 h-2 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full mr-2'></div>
+                              {field.label}
+                            </h4>
+                            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                              {field.fields.map((subField: any) =>
+                                renderFieldValue(subField, fieldPath)
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (value === undefined || value === null || value === '') {
+                      return null;
+                    }
+
+                    return (
+                      <div
+                        key={fieldPath}
+                        className='space-y-2 p-3 bg-white/60 rounded-lg border border-gray-100 hover:bg-white/80 transition-colors duration-200'
+                      >
+                        <dt className='text-sm font-semibold text-slate-600 uppercase tracking-wide'>
+                          {field.label}
+                        </dt>
+                        <dd className='text-base text-slate-800 font-medium'>
+                          {field.type === 'checkbox' ? (
+                            value ? (
+                              <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800'>
+                                Yes
+                              </span>
+                            ) : (
+                              <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800'>
+                                No
+                              </span>
+                            )
+                          ) : (
+                            String(value)
+                          )}
+                        </dd>
+                      </div>
+                    );
+                  };
+
+                  return renderFieldValue(field);
+                })}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Enhanced confirmation notice */}
+      <div className='relative overflow-hidden bg-gradient-to-r from-blue-50 via-cyan-50/30 to-blue-50 border-2 border-blue-200/60 rounded-xl p-6 shadow-lg'>
+        {/* Decorative background */}
+        <div className='absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-200/20 to-cyan-200/20 rounded-full blur-2xl'></div>
+        <div className='absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-200/20 to-blue-200/20 rounded-full blur-xl'></div>
+
+        <div className='relative flex items-start space-x-4'>
+          <div className='flex-shrink-0'>
+            <div className='flex items-center justify-center w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full shadow-lg shadow-blue-500/30'>
+              <svg
+                className='w-5 h-5 text-white'
+                fill='currentColor'
+                viewBox='0 0 20 20'
+              >
+                <path
+                  fillRule='evenodd'
+                  d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z'
+                  clipRule='evenodd'
+                />
+              </svg>
+            </div>
+          </div>
+          <div>
+            <h4 className='font-bold text-blue-900 mb-2'>Important Notice</h4>
+            <p className='text-blue-800 leading-relaxed'>
+              By submitting this form, you confirm that all information provided
+              is accurate and complete. Please ensure all details are correct
+              before proceeding.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
+  )
 );
+
+ReviewStep.displayName = 'ReviewStep';
 
 
 
@@ -1405,30 +1446,26 @@ interface StepContentProps {
   totalSteps: number;
   formData: FormData;
   updateField: (key: string, value: any) => void;
-  errors: Record<string, string>;
 }
 
 /**
  * Renders the content for a specific step in the multi-step form
  *
- * This component is responsible for displaying the current step's fields,
- * step information, and validation errors. It serves as the main content
- * area for each step, rendering individual FormField components for each
- * field defined in the step schema.
+ * This component is responsible for displaying the current step's fields
+ * and step information. It serves as the main content area for each step,
+ * rendering individual FormField components for each field defined in the step schema.
  *
  * The component provides:
  * - Step title and progress indicator
  * - Dynamic field rendering based on step schema
- * - Comprehensive error display with visual indicators
  * - Consistent layout and styling for all steps
  *
  * @param props - Component properties
  * @param props.currentStepData - Schema definition for the current step
  * @param props.currentStep - Current step index (0-based)
  * @param props.totalSteps - Total number of steps in the form
- * @param props.formData - Current form data for field values and validation
+ * @param props.formData - Current form data for field values
  * @param props.updateField - Function to update field values
- * @param props.errors - Validation errors for display
  *
  * @example
  * ```typescript
@@ -1438,72 +1475,119 @@ interface StepContentProps {
  *   totalSteps={3}
  *   formData={formData}
  *   updateField={updateField}
- *   errors={errors}
  * />
  * ```
  */
-export const StepContent: React.FC<StepContentProps> = ({
-  currentStepData,
-  currentStep,
-  totalSteps,
-  formData,
-  updateField,
-  errors,
-}) => {
-  return (
-    <div className='space-y-8'>
-      {/* Step header with title and progress indicator */}
-      <div className='text-center'>
-        <h2 className='text-2xl font-bold text-gray-900 mb-2'>
-          {currentStepData.title}
-        </h2>
-        <p className='text-gray-600'>
-          Step {currentStep + 1} of {totalSteps - 1}
-        </p>
-      </div>
+export const StepContent: React.FC<StepContentProps> = React.memo(
+  ({ currentStepData, currentStep, totalSteps, formData, updateField }) => {
+    console.log('StepContent rendered');
+    return (
+      <div className='space-y-8'>
+        {/* Enhanced step header */}
+        <div className='text-center relative'>
+          {/* Decorative elements */}
+          <div className='absolute -top-4 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full'></div>
 
-      {/* Form fields for the current step */}
-      <div className='space-y-6'>
-        {currentStepData.fields.map(field => (
-          <FormField
-            key={field.key}
-            field={field}
-            formData={formData}
-            onUpdate={updateField}
-            errors={errors}
-          />
-        ))}
-      </div>
+          <div className='pt-4'>
+            <h2 className='text-3xl font-bold bg-gradient-to-r from-slate-800 to-blue-900 bg-clip-text text-transparent mb-3'>
+              {currentStepData.title}
+            </h2>
 
-      {/* Error summary display */}
-      {Object.keys(errors).length > 0 && (
-        <div className='bg-red-50 border border-red-200 rounded-lg p-4'>
-          <div className='flex items-center mb-2'>
-            <svg
-              className='w-5 h-5 text-red-600 mr-2'
-              fill='currentColor'
-              viewBox='0 0 20 20'
-            >
-              <path
-                fillRule='evenodd'
-                d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z'
-                clipRule='evenodd'
-              />
-            </svg>
-            <h3 className='text-sm font-medium text-red-800'>
-              Please correct the following errors:
-            </h3>
+            {/* Enhanced progress indicator */}
+            <div className='flex items-center justify-center space-x-3 mb-4'>
+              <span className='text-slate-600 font-medium'>Step</span>
+              <div className='flex items-center space-x-2'>
+                <span className='inline-flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-bold rounded-full shadow-lg shadow-blue-500/30'>
+                  {currentStep + 1}
+                </span>
+                <span className='text-slate-400 font-medium'>of</span>
+                <span className='inline-flex items-center justify-center w-8 h-8 bg-slate-200 text-slate-600 text-sm font-bold rounded-full'>
+                  {totalSteps - 1}
+                </span>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className='max-w-md mx-auto'>
+              <div className='flex items-center justify-between text-xs text-slate-500 mb-2'>
+                <span>Progress</span>
+                <span>
+                  {Math.round(((currentStep + 1) / (totalSteps - 1)) * 100)}%
+                </span>
+              </div>
+              <div className='w-full bg-slate-200 rounded-full h-2 overflow-hidden'>
+                <div
+                  className='h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500 ease-out shadow-lg'
+                  style={{
+                    width: `${((currentStep + 1) / (totalSteps - 1)) * 100}%`,
+                  }}
+                >
+                  <div className='h-full bg-gradient-to-r from-blue-300/50 to-cyan-300/50 animate-pulse'></div>
+                </div>
+              </div>
+            </div>
           </div>
-          <ul className='list-disc list-inside text-sm text-red-700 space-y-1'>
-            {Object.values(errors).map((error, index) => (
-              <li key={index}>{error}</li>
-            ))}
-          </ul>
         </div>
-      )}
-    </div>
-  );
-};
+
+        {/* Enhanced form fields container */}
+        <div className='bg-gradient-to-b from-white to-gray-50/30 rounded-xl border border-gray-200/60 p-6 md:p-8 shadow-lg'>
+          <div className='space-y-8'>
+            {currentStepData.fields.map((field, index) => (
+              <div
+                key={field.key}
+                className='group relative'
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                {/* Field container with enhanced styling */}
+                <div className='relative bg-white/80 rounded-lg border border-gray-200/60 p-4 hover:border-blue-200 hover:shadow-md transition-all duration-300 hover:bg-white'>
+                  {/* Subtle gradient overlay on hover */}
+                  <div className='absolute inset-0 bg-gradient-to-r from-blue-50/0 to-cyan-50/0 group-hover:from-blue-50/30 group-hover:to-cyan-50/20 rounded-lg transition-all duration-300 pointer-events-none'></div>
+
+                  <div className='relative z-10'>
+                    <FormField
+                      field={field}
+                      formData={formData}
+                      onUpdate={updateField}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Helpful tip section */}
+        <div className='bg-gradient-to-r from-cyan-50/50 via-blue-50/30 to-cyan-50/50 border border-cyan-200/60 rounded-xl p-5 relative overflow-hidden'>
+          <div className='absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-cyan-200/20 to-blue-200/20 rounded-full blur-xl'></div>
+          <div className='relative flex items-start space-x-3'>
+            <div className='flex-shrink-0 w-8 h-8 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-cyan-400/30'>
+              <svg
+                className='w-4 h-4 text-white'
+                fill='currentColor'
+                viewBox='0 0 20 20'
+              >
+                <path
+                  fillRule='evenodd'
+                  d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z'
+                  clipRule='evenodd'
+                />
+              </svg>
+            </div>
+            <div>
+              <h4 className='font-semibold text-slate-800 mb-1'>Helpful Tip</h4>
+              <p className='text-sm text-slate-600'>
+                Take your time to fill out all fields accurately. You can always
+                go back to previous steps if needed.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
+
+StepContent.displayName = 'StepContent';
 
 
 
@@ -1567,167 +1651,63 @@ Button.displayName = 'Button';
 
 'use client';
 
-import { SchemaValidator } from '@/lib/schema-validator';
 import { FormData, FormSchema, UseMultiStepFormReturn } from '@/lib/types';
 import { useCallback, useMemo, useState } from 'react';
 
 /**
- * Custom hook for managing multi-step form state and logic
- *
- * This hook provides a comprehensive solution for multi-step form management including:
- * - Step navigation (next/previous)
- * - Form data management with nested field support
- * - Real-time validation using SchemaValidator
- * - Error state management
- * - Form submission handling
- *
- * The hook automatically handles field updates, validation, and step transitions
- * while maintaining a clean API for form components.
- *
- * @param schema - The form schema defining steps, fields, and validation rules
- * @returns Object containing form state and control functions
- *
- * @example
- * ```typescript
- * const {
- *   currentStep,
- *   formData,
- *   errors,
- *   nextStep,
- *   prevStep,
- *   updateField,
- *   submitForm
- * } = useMultiStepForm(formSchema);
- *
- * // Update a field
- * updateField('firstName', 'John');
- *
- * // Navigate to next step
- * const success = await nextStep();
- * ```
+ * Simplified custom hook for managing multi-step form state and logic
  */
 export const useMultiStepForm = (
   schema: FormSchema
 ): UseMultiStepFormReturn => {
-  /** Current step index (0-based) */
   const [currentStep, setCurrentStep] = useState(0);
-
-  /** Form data object with nested field support */
   const [formData, setFormData] = useState<FormData>({});
-
-  /** Validation errors mapped by field path */
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  /** Total number of steps in the form */
   const totalSteps = schema.steps.length;
 
   /**
    * Updates a specific field in the form data
-   *
-   * Handles nested field updates for group fields using dot notation.
-   * Automatically clears any existing validation errors for the updated field.
-   *
-   * @param key - Field path (e.g., 'address.city' for nested fields)
-   * @param value - New value for the field
-   *
-   * @example
-   * ```typescript
-   * // Update a simple field
-   * updateField('firstName', 'John');
-   *
-   * // Update a nested field
-   * updateField('address.city', 'New York');
-   * ```
    */
   const updateField = useCallback((key: string, value: any) => {
     setFormData(prev => {
       const newData = { ...prev };
-      SchemaValidator.setNestedValue(newData, key, value);
-      return newData;
-    });
+      const keys = key.split('.');
+      let current = newData;
 
-    // Clear error for this field when user starts typing
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[key];
-      return newErrors;
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) {
+          current[keys[i]] = {};
+        }
+        current = current[keys[i]];
+      }
+
+      current[keys[keys.length - 1]] = value;
+      return newData;
     });
   }, []);
 
   /**
-   * Validates the current step and moves to the next step if valid
-   *
-   * Performs comprehensive validation using SchemaValidator.validateStep()
-   * before allowing progression. If validation fails, errors are set and
-   * the function returns false. If validation passes, the step is incremented
-   * and errors are cleared.
-   *
-   * @returns Promise<boolean> - True if successfully moved to next step, false if validation failed
-   *
-   * @example
-   * ```typescript
-   * const success = await nextStep();
-   * if (success) {
-   *   console.log('Moved to next step');
-   * } else {
-   *   console.log('Validation failed, check errors');
-   * }
-   * ```
+   * Moves to the next step
    */
   const nextStep = useCallback(async (): Promise<boolean> => {
     if (currentStep >= totalSteps - 1) return false;
-
-    const currentStepFields = schema.steps[currentStep].fields;
-    const stepErrors = SchemaValidator.validateStep(
-      currentStepFields,
-      formData
-    );
-
-    if (Object.keys(stepErrors).length > 0) {
-      setErrors(stepErrors);
-      return false;
-    }
-
-    setErrors({});
     setCurrentStep(prev => Math.min(prev + 1, totalSteps - 1));
     return true;
-  }, [currentStep, totalSteps, schema.steps, formData]);
+  }, [currentStep, totalSteps]);
 
   /**
    * Moves to the previous step
-   *
-   * Decrements the current step index and clears any validation errors.
-   * Cannot go below step 0.
-   *
-   * @example
-   * ```typescript
-   * prevStep(); // Go back one step
-   * ```
    */
   const prevStep = useCallback(() => {
     setCurrentStep(prev => Math.max(prev - 1, 0));
-    setErrors({});
   }, []);
 
   /**
    * Jumps to a specific step by index
-   *
-   * Validates the target step index and clears errors when jumping.
-   * Useful for implementing step navigation or allowing users to jump
-   * to previously completed steps.
-   *
-   * @param stepIndex - Target step index (0-based)
-   *
-   * @example
-   * ```typescript
-   * goToStep(2); // Jump to step 3 (index 2)
-   * ```
    */
   const goToStep = useCallback(
     (stepIndex: number) => {
       if (stepIndex >= 0 && stepIndex < totalSteps) {
         setCurrentStep(stepIndex);
-        setErrors({});
       }
     },
     [totalSteps]
@@ -1735,118 +1715,49 @@ export const useMultiStepForm = (
 
   /**
    * Resets the form to its initial state
-   *
-   * Clears all form data, errors, and returns to the first step.
-   * Useful for implementing a "Start Over" functionality.
-   *
-   * @example
-   * ```typescript
-   * resetForm(); // Reset everything and go to step 1
-   * ```
    */
   const resetForm = useCallback(() => {
     setCurrentStep(0);
     setFormData({});
-    setErrors({});
   }, []);
 
   /**
    * Submits the final form data
-   *
-   * Validates the current step before submission. If validation passes,
-   * returns the complete form data. If validation fails, sets errors
-   * and returns null.
-   *
-   * @returns Promise<FormData | null> - Form data if valid, null if validation failed
-   *
-   * @example
-   * ```typescript
-   * const finalData = await submitForm();
-   * if (finalData) {
-   *   // Send data to server
-   *   await api.submitForm(finalData);
-   * }
-   * ```
    */
-  // Replace the submitForm function in your useMultiStepForm hook with this:
   const submitForm = useCallback(async (): Promise<FormData | null> => {
-    // Keeps your original validation logic
-    const currentStepFields = schema.steps[currentStep].fields;
-    const stepErrors = SchemaValidator.validateStep(
-      currentStepFields,
-      formData
+    // Show alert to user
+    alert(
+      'Form submitted successfully! Check the browser console to see your data.'
     );
 
-    if (Object.keys(stepErrors).length > 0) {
-      setErrors(stepErrors);
-      console.warn(
-        '❌ Form submission failed - Validation errors:',
-        stepErrors
-      );
-      alert('Please fix the validation errors before submitting.');
-      return null;
-    }
+    // Log the form data to console
+    console.log('✅ Form submitted successfully!');
+    console.log('📊 Form Data (JSON):', JSON.stringify(formData, null, 2));
 
-    try {
-      // Show warning with form data in console
-      console.warn('⚠️ FORM SUBMISSION - Data being submitted:', formData);
-      alert(
-        '⚠️ Warning: Form data has been logged to console. Check browser dev tools.'
-      );
+    return formData;
+  }, [formData]);
 
-      // Return the form data (as your hook expects)
-      return formData;
-    } catch (error) {
-      console.error('❌ Form submission error:', error);
-      alert('An error occurred while submitting the form. Please try again.');
-      return null;
-    }
-  }, [currentStep, schema.steps, formData]);
-
-  /**
-   * Computed property indicating if the current step is valid
-   *
-   * A step is considered valid if it has no validation errors.
-   * This is useful for enabling/disabling navigation buttons.
-   */
+  // Computed properties
   const isValid = useMemo(() => {
-    return Object.keys(errors).length === 0;
-  }, [errors]);
+    return true; // Always valid since no validation is implemented
+  }, []);
 
-  /**
-   * Computed property indicating if the user can proceed to the next step
-   *
-   * Can go next if:
-   * - Not on the last step
-   * - Current step has no validation errors
-   */
   const canGoNext = useMemo(() => {
-    return currentStep < totalSteps - 1 && isValid;
-  }, [currentStep, totalSteps, isValid]);
+    return currentStep < totalSteps - 1;
+  }, [currentStep, totalSteps]);
 
-  /**
-   * Computed property indicating if the user can go to the previous step
-   *
-   * Can go previous if not on the first step.
-   */
   const canGoPrev = useMemo(() => {
     return currentStep > 0;
   }, [currentStep]);
 
-  /**
-   * Computed property indicating if the user can submit the form
-   *
-   * Can submit if on the last step and the form is valid.
-   */
   const canSubmit = useMemo(() => {
-    return currentStep === totalSteps - 1 && isValid;
-  }, [currentStep, totalSteps, isValid]);
+    return currentStep === totalSteps - 1;
+  }, [currentStep, totalSteps]);
 
   return {
     currentStep,
     totalSteps,
     formData,
-    errors,
     isValid,
     canGoNext,
     canGoPrev,
@@ -2099,11 +2010,6 @@ jest.setTimeout(10000);
 
 
 
------ FILE: lib\schema-validator.ts -----
-
-
-
-
 ----- FILE: lib\types.ts -----
 
 /**
@@ -2156,16 +2062,6 @@ export interface FormSchema {
 export type FormData = Record<string, any>;
 
 /**
- * Form state management types
- */
-export interface FormState {
-  currentStep: number;
-  data: FormData;
-  errors: Record<string, string>;
-  isValid: boolean;
-}
-
-/**
  * Hook return type for form management
  *
  * Provides comprehensive form state and control functions for multi-step forms
@@ -2177,9 +2073,7 @@ export interface UseMultiStepFormReturn {
   totalSteps: number;
   /** Form data object with nested field support */
   formData: FormData;
-  /** Validation errors mapped by field path */
-  errors: Record<string, string>;
-  /** Whether the current step has no validation errors */
+  /** Whether the current step is valid */
   isValid: boolean;
   /** Whether the user can proceed to the next step */
   canGoNext: boolean;
@@ -2189,7 +2083,7 @@ export interface UseMultiStepFormReturn {
   canSubmit: boolean;
   /** Function to update a specific field value */
   updateField: (key: string, value: any) => void;
-  /** Function to validate and move to next step */
+  /** Function to move to next step */
   nextStep: () => Promise<boolean>;
   /** Function to move to previous step */
   prevStep: () => void;
@@ -2197,7 +2091,7 @@ export interface UseMultiStepFormReturn {
   goToStep: (stepIndex: number) => void;
   /** Function to reset form to initial state */
   resetForm: () => void;
-  /** Function to submit the final form data - FIXED: Returns FormData | null */
+  /** Function to submit the final form data */
   submitForm: () => Promise<FormData | null>;
 }
 
@@ -2225,7 +2119,6 @@ export interface FormFieldProps {
   field: FormField;
   formData: FormData;
   onUpdate: (key: string, value: any) => void;
-  errors: Record<string, string>;
   parentPath?: string;
 }
 
@@ -2256,590 +2149,6 @@ export function debounce<T extends (...args: any[]) => any>(
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
-}
-
-
-
------ FILE: lib\validation.ts -----
-
-/**
- * Validation utilities using Zod for form validation
- * Provides robust validation for common field types with detailed error messages
- */
-
-import { z } from 'zod';
-
-/**
- * Validation result interface containing validation status and error messages
- */
-export interface ValidationResult {
-  /** Whether the field value is valid */
-  isValid: boolean;
-  /** Array of error messages for the field */
-  errors: string[];
-  /** The normalized/cleaned value if applicable */
-  normalizedValue?: any;
-}
-
-/**
- * Field validation options for different validation rules
- */
-export interface ValidationOptions {
-  /** Whether the field is required */
-  required?: boolean;
-  /** Minimum length for string fields */
-  minLength?: number;
-  /** Maximum length for string fields */
-  maxLength?: number;
-  /** Minimum value for numeric fields */
-  minValue?: number;
-  /** Maximum value for numeric fields */
-  maxValue?: number;
-  /** Custom validation function */
-  customValidator?: (value: any) => ValidationResult;
-  /** Whether to trim whitespace from string values */
-  trim?: boolean;
-  /** Whether to allow empty strings (different from required) */
-  allowEmpty?: boolean;
-}
-
-/**
- * Validates a text field with comprehensive checks using Zod
- */
-export function validateText(
-  value: any,
-  fieldName: string,
-  options: ValidationOptions = {}
-): ValidationResult {
-  try {
-    const schema = z.string();
-    const result = schema.safeParse(value);
-
-    if (!result.success) {
-      return {
-        isValid: false,
-        errors: result.error.issues.map(issue => issue.message),
-        normalizedValue: value,
-      };
-    }
-
-    let textValue = result.data;
-    const errors: string[] = [];
-
-    // Apply validation rules
-    if (options.required && (!textValue || textValue.trim() === '')) {
-      errors.push(`${fieldName} is required`);
-    }
-
-    if (
-      textValue &&
-      options.minLength &&
-      textValue.length < options.minLength
-    ) {
-      errors.push(
-        `${fieldName} must be at least ${options.minLength} characters`
-      );
-    }
-
-    if (
-      textValue &&
-      options.maxLength &&
-      textValue.length > options.maxLength
-    ) {
-      errors.push(
-        `${fieldName} must be no more than ${options.maxLength} characters`
-      );
-    }
-
-    if (options.trim && textValue) {
-      textValue = textValue.trim();
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      normalizedValue: textValue,
-    };
-  } catch (error) {
-    return {
-      isValid: false,
-      errors: [`${fieldName} validation failed`],
-      normalizedValue: value,
-    };
-  }
-}
-
-/**
- * Validates an email address using Zod
- */
-export function validateEmail(
-  value: any,
-  fieldName: string = 'Email',
-  options: ValidationOptions = {}
-): ValidationResult {
-  try {
-    const schema = z
-      .string()
-      .email(`${fieldName} must be a valid email address`);
-    const result = schema.safeParse(value);
-
-    if (!result.success) {
-      return {
-        isValid: false,
-        errors: result.error.issues.map(issue => issue.message),
-        normalizedValue: value,
-      };
-    }
-
-    const errors: string[] = [];
-
-    if (options.required && (!result.data || result.data.trim() === '')) {
-      errors.push(`${fieldName} is required`);
-    }
-
-    if (result.data && result.data.length > 254) {
-      errors.push(`${fieldName} is too long (maximum 254 characters)`);
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      normalizedValue: result.data,
-    };
-  } catch (error) {
-    return {
-      isValid: false,
-      errors: [`${fieldName} validation failed`],
-      normalizedValue: value,
-    };
-  }
-}
-
-/**
- * Validates a phone number using Zod
- */
-export function validatePhoneNumber(
-  value: any,
-  fieldName: string = 'Phone Number',
-  options: ValidationOptions = {}
-): ValidationResult {
-  try {
-    const schema = z
-      .string()
-      .regex(/^\d{7,15}$/, `${fieldName} must be 7-15 digits only`);
-    const result = schema.safeParse(value);
-
-    if (!result.success) {
-      return {
-        isValid: false,
-        errors: result.error.issues.map(issue => issue.message),
-        normalizedValue: value,
-      };
-    }
-
-    const errors: string[] = [];
-
-    if (options.required && (!result.data || result.data.trim() === '')) {
-      errors.push(`${fieldName} is required`);
-    }
-
-    if (result.data && result.data.length < 7) {
-      errors.push(`${fieldName} must be at least 7 digits`);
-    }
-
-    if (result.data && result.data.length > 15) {
-      errors.push(`${fieldName} is too long (maximum 15 digits)`);
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      normalizedValue: result.data,
-    };
-  } catch (error) {
-    return {
-      isValid: false,
-      errors: [`${fieldName} validation failed`],
-      normalizedValue: value,
-    };
-  }
-}
-
-/**
- * Validates a name field using Zod
- */
-export function validateName(
-  value: any,
-  fieldName: string = 'Name',
-  options: ValidationOptions = {}
-): ValidationResult {
-  try {
-    const schema = z.string();
-    const result = schema.safeParse(value);
-
-    if (!result.success) {
-      return {
-        isValid: false,
-        errors: result.error.issues.map(issue => issue.message),
-        normalizedValue: value,
-      };
-    }
-
-    let nameValue = result.data;
-    const errors: string[] = [];
-
-    if (options.required && (!nameValue || nameValue.trim() === '')) {
-      errors.push(`${fieldName} is required`);
-    }
-
-    if (nameValue) {
-      if (nameValue.length < 2) {
-        errors.push(`${fieldName} must be at least 2 characters`);
-      }
-
-      if (nameValue.length > 100) {
-        errors.push(`${fieldName} is too long (maximum 100 characters)`);
-      }
-
-      if (!/^[a-zA-ZÀ-ÿ\s\-'\.]+$/.test(nameValue)) {
-        errors.push(`${fieldName} contains invalid characters`);
-      }
-
-      if (/\s{2,}/.test(nameValue)) {
-        errors.push(`${fieldName} cannot contain consecutive spaces`);
-      }
-
-      if (nameValue !== nameValue.trim()) {
-        errors.push(`${fieldName} cannot start or end with spaces`);
-      }
-
-      if (options.trim) {
-        nameValue = nameValue.trim();
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      normalizedValue: nameValue,
-    };
-  } catch (error) {
-    return {
-      isValid: false,
-      errors: [`${fieldName} validation failed`],
-      normalizedValue: value,
-    };
-  }
-}
-
-/**
- * Validates a numeric field using Zod
- */
-export function validateNumber(
-  value: any,
-  fieldName: string = 'Number',
-  options: ValidationOptions & {
-    /** Whether to allow decimal numbers */
-    allowDecimals?: boolean;
-    /** Whether to allow negative numbers */
-    allowNegative?: boolean;
-    /** Number of decimal places allowed */
-    decimalPlaces?: number;
-  } = {}
-): ValidationResult {
-  try {
-    const schema = z.coerce.number({
-      errorMap: () => ({ message: `${fieldName} must be a valid number` }),
-    });
-    const result = schema.safeParse(value);
-
-    if (!result.success) {
-      return {
-        isValid: false,
-        errors: result.error.issues.map(issue => issue.message),
-        normalizedValue: value,
-      };
-    }
-
-    const numValue = result.data;
-    const errors: string[] = [];
-
-    if (options.required && (numValue === undefined || numValue === null)) {
-      errors.push(`${fieldName} is required`);
-    }
-
-    if (!options.allowNegative && numValue < 0) {
-      errors.push(`${fieldName} cannot be negative`);
-    }
-
-    if (options.minValue !== undefined && numValue < options.minValue) {
-      errors.push(`${fieldName} must be at least ${options.minValue}`);
-    }
-
-    if (options.maxValue !== undefined && numValue > options.maxValue) {
-      errors.push(`${fieldName} must be no more than ${options.maxValue}`);
-    }
-
-    if (!options.allowDecimals && !Number.isInteger(numValue)) {
-      errors.push(`${fieldName} must be a whole number`);
-    }
-
-    if (options.decimalPlaces !== undefined) {
-      const decimalStr = numValue.toString().split('.')[1];
-      if (decimalStr && decimalStr.length > options.decimalPlaces) {
-        errors.push(
-          `${fieldName} cannot have more than ${options.decimalPlaces} decimal places`
-        );
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      normalizedValue: numValue,
-    };
-  } catch (error) {
-    return {
-      isValid: false,
-      errors: [`${fieldName} validation failed`],
-      normalizedValue: value,
-    };
-  }
-}
-
-/**
- * Validates a date field using Zod
- */
-export function validateDate(
-  value: any,
-  fieldName: string = 'Date',
-  options: ValidationOptions & {
-    /** Minimum allowed date */
-    minDate?: Date;
-    /** Maximum allowed date */
-    maxDate?: Date;
-    /** Whether to allow future dates */
-    allowFuture?: boolean;
-    /** Whether to allow past dates */
-    allowPast?: boolean;
-  } = {}
-): ValidationResult {
-  try {
-    let dateValue: Date;
-
-    // Convert to Date object
-    if (value instanceof Date) {
-      dateValue = value;
-    } else if (typeof value === 'number') {
-      dateValue = new Date(value);
-    } else if (typeof value === 'string') {
-      dateValue = new Date(value);
-    } else {
-      return {
-        isValid: false,
-        errors: [`${fieldName} must be a valid date`],
-        normalizedValue: value,
-      };
-    }
-
-    const errors: string[] = [];
-
-    // Check if date is valid
-    if (isNaN(dateValue.getTime())) {
-      errors.push(`${fieldName} must be a valid date`);
-      return {
-        isValid: false,
-        errors,
-        normalizedValue: value,
-      };
-    }
-
-    if (options.required && !dateValue) {
-      errors.push(`${fieldName} is required`);
-    }
-
-    if (!options.allowFuture && dateValue > new Date()) {
-      errors.push(`${fieldName} cannot be in the future`);
-    }
-
-    if (!options.allowPast && dateValue < new Date()) {
-      errors.push(`${fieldName} cannot be in the past`);
-    }
-
-    if (options.minDate && dateValue < options.minDate) {
-      errors.push(
-        `${fieldName} cannot be earlier than ${options.minDate.toLocaleDateString()}`
-      );
-    }
-
-    if (options.maxDate && dateValue > options.maxDate) {
-      errors.push(
-        `${fieldName} cannot be later than ${options.maxDate.toLocaleDateString()}`
-      );
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      normalizedValue: dateValue,
-    };
-  } catch (error) {
-    return {
-      isValid: false,
-      errors: [`${fieldName} validation failed`],
-      normalizedValue: value,
-    };
-  }
-}
-
-/**
- * Validates a required field with custom validation logic
- */
-export function validateRequired(
-  value: any,
-  fieldName: string,
-  validator?: (value: any) => ValidationResult
-): ValidationResult {
-  const errors: string[] = [];
-
-  // Check if required field is present
-  if (value === undefined || value === null || value === '') {
-    errors.push(`${fieldName} is required`);
-    return { isValid: false, errors };
-  }
-
-  // Apply custom validation if provided
-  if (validator) {
-    const customResult = validator(value);
-    if (!customResult.isValid) {
-      errors.push(...customResult.errors);
-    }
-  }
-
-  return { isValid: errors.length === 0, errors, normalizedValue: value };
-}
-
-/**
- * Validates multiple fields and returns combined results
- */
-export function combineValidations(
-  validations: ValidationResult[]
-): ValidationResult {
-  const allErrors: string[] = [];
-  const allNormalizedValues: Record<string, any> = {};
-
-  validations.forEach((validation, index) => {
-    if (!validation.isValid) {
-      allErrors.push(...validation.errors);
-    }
-    if (validation.normalizedValue !== undefined) {
-      allNormalizedValues[`field_${index}`] = validation.normalizedValue;
-    }
-  });
-
-  return {
-    isValid: allErrors.length === 0,
-    errors: allErrors,
-    normalizedValue: allNormalizedValues,
-  };
-}
-
-/**
- * Validates a name field specifically for forms using Zod
- */
-export function validateNameField(
-  value: any,
-  fieldName: string = 'Name',
-  options: ValidationOptions = {}
-): ValidationResult {
-  try {
-    // Reject numbers and other non-string types
-    if (typeof value === 'number') {
-      return {
-        isValid: false,
-        errors: [`${fieldName} must be text, not a number`],
-        normalizedValue: value,
-      };
-    }
-
-    if (typeof value !== 'string') {
-      return {
-        isValid: false,
-        errors: [`${fieldName} must be text`],
-        normalizedValue: value,
-      };
-    }
-
-    const schema = z.string();
-    const result = schema.safeParse(value);
-
-    if (!result.success) {
-      return {
-        isValid: false,
-        errors: result.error.issues.map(issue => issue.message),
-        normalizedValue: value,
-      };
-    }
-
-    let nameValue = result.data;
-    const errors: string[] = [];
-
-    if (options.required && (!nameValue || nameValue.trim() === '')) {
-      errors.push(`${fieldName} is required`);
-    }
-
-    if (nameValue) {
-      if (nameValue.length < 2) {
-        errors.push(`${fieldName} must be at least 2 characters`);
-      }
-
-      if (nameValue.length > 100) {
-        errors.push(`${fieldName} is too long (maximum 100 characters)`);
-      }
-
-      if (!/^[a-zA-ZÀ-ÿ\s\-'\.]+$/.test(nameValue)) {
-        errors.push(
-          `${fieldName} can only contain letters, spaces, hyphens, apostrophes, and periods`
-        );
-      }
-
-      if (/\s{2,}/.test(nameValue)) {
-        errors.push(`${fieldName} cannot contain consecutive spaces`);
-      }
-
-      if (nameValue !== nameValue.trim()) {
-        errors.push(`${fieldName} cannot start or end with spaces`);
-      }
-
-      if (options.trim) {
-        nameValue = nameValue.trim();
-      }
-
-      if (options.minLength && nameValue.length < options.minLength) {
-        errors.push(
-          `${fieldName} must be at least ${options.minLength} characters`
-        );
-      }
-
-      if (options.maxLength && nameValue.length > options.maxLength) {
-        errors.push(
-          `${fieldName} must be no more than ${options.maxLength} characters`
-        );
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      normalizedValue: nameValue,
-    };
-  } catch (error) {
-    return {
-      isValid: false,
-      errors: [`${fieldName} validation failed`],
-      normalizedValue: value,
-    };
-  }
 }
 
 
@@ -2989,542 +2298,6 @@ const treeStr = generateTree(rootDir);
 fs.writeFileSync(outputFile, treeStr);
 
 console.log(`✅ Project structure saved to ${outputFile}`);
-
-
-
------ FILE: validations\form-schemas.ts -----
-
-import { z } from 'zod';
-
-/**
- * Dynamic schema generator based on form configuration
- * Creates Zod schemas for validation at runtime
- */
-
-export const createFieldSchema = (field: any): z.ZodTypeAny => {
-  let schema: z.ZodTypeAny;
-
-  switch (field.type) {
-    case 'text':
-      schema = z.string();
-      if (field.key === 'email') {
-        schema = (schema as z.ZodString).email(
-          'Please enter a valid email address'
-        );
-      } else if (field.key === 'fullName') {
-        schema = (schema as z.ZodString).min(1, ${field.label} is required);
-      } else if (field.key === 'phone') {
-        schema = (schema as z.ZodString).min(
-          10,
-          'Phone number must be at least 10 digits'
-        );
-      }
-      break;
-    case 'number':
-      schema = z.coerce.number().min(0, 'Must be a positive number');
-      break;
-    case 'select':
-      if (field.options) {
-        schema = z.enum(field.options as [string, ...string[]]);
-      } else {
-        schema = z.string();
-      }
-      break;
-    case 'checkbox':
-      schema = z.boolean().default(false);
-      break;
-    case 'radio':
-      if (field.options) {
-        schema = z.enum(field.options as [string, ...string[]]);
-      } else {
-        schema = z.string();
-      }
-      break;
-    case 'date':
-      schema = z.string().refine(date => !isNaN(Date.parse(date)), {
-        message: 'Please enter a valid date',
-      });
-      break;
-    case 'group':
-      const groupSchema: Record<string, z.ZodTypeAny> = {};
-      if (field.fields) {
-        field.fields.forEach((subField: any) => {
-          groupSchema[subField.key] = createFieldSchema(subField);
-          if (subField.required) {
-            // Apply required validation based on field type
-            if (
-              subField.type === 'text' ||
-              subField.type === 'select' ||
-              subField.type === 'radio'
-            ) {
-              groupSchema[subField.key] = (
-                groupSchema[subField.key] as z.ZodString
-              ).min(1, ${subField.label} is required);
-            } else if (subField.type === 'number') {
-              // Number fields are already validated by coerce.number().min(0)
-              // Additional required validation not needed
-            }
-          }
-        });
-      }
-      schema = z.object(groupSchema);
-      break;
-    default:
-      schema = z.string();
-  }
-
-  if (field.required && field.type !== 'checkbox' && field.type !== 'group') {
-    schema = (schema as z.ZodString).min(1, ${field.label} is required);
-  }
-
-  return schema;
-};
-
-/**
- * Creates a complete schema for all form steps
- */
-export const createFormSchema = (steps: any[]) => {
-  const schemaObject: Record<string, z.ZodTypeAny> = {};
-
-  steps.forEach(step => {
-    step.fields.forEach((field: any) => {
-      schemaObject[field.key] = createFieldSchema(field);
-    });
-  });
-
-  return z.object(schemaObject);
-};
-
-/**
- * Base validation schemas for common field types
- */
-export const baseSchemas = {
-  email: z.string().email('Please enter a valid email address'),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-  required: z.string().min(1, 'This field is required'),
-  number: z.coerce.number().min(0, 'Must be a positive number'),
-  boolean: z.boolean().default(false),
-};
-
-
-
------ FILE: __tests__\lib\validation.test.ts -----
-
-import {
-  combineValidations,
-  validateDate,
-  validateEmail,
-  validateName,
-  validateNameField,
-  validateNumber,
-  validatePhoneNumber,
-  validateRequired,
-  validateText,
-  ValidationResult,
-} from '@/lib/validation';
-
-describe('Validation Utilities', () => {
-  describe('validateText', () => {
-    it('should validate required text fields', () => {
-      const result = validateText('', 'Test Field', { required: true });
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Test Field is required');
-    });
-
-    it('should validate minimum length', () => {
-      const result = validateText('ab', 'Test Field', { minLength: 3 });
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Test Field must be at least 3 characters'
-      );
-    });
-
-    it('should validate maximum length', () => {
-      const result = validateText('abcdef', 'Test Field', { maxLength: 5 });
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Test Field must be no more than 5 characters'
-      );
-    });
-
-    it('should trim whitespace when trim option is true', () => {
-      const result = validateText('  test  ', 'Test Field', { trim: true });
-      expect(result.isValid).toBe(true);
-      expect(result.normalizedValue).toBe('test');
-    });
-
-    it('should allow empty strings when not required and allowEmpty is true', () => {
-      const result = validateText('', 'Test Field', { allowEmpty: true });
-      expect(result.isValid).toBe(true);
-    });
-
-    it('should validate valid text input', () => {
-      const result = validateText('valid text', 'Test Field');
-      expect(result.isValid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-  });
-
-  describe('validateEmail', () => {
-    it('should validate valid email addresses', () => {
-      const validEmails = [
-        'test@example.com',
-        'user.name@domain.co.uk',
-        'user+tag@example.org',
-        '123@example.com',
-      ];
-
-      validEmails.forEach(email => {
-        const result = validateEmail(email, 'Email');
-        expect(result.isValid).toBe(true);
-        expect(result.errors).toHaveLength(0);
-      });
-    });
-
-    it('should validate email length limits', () => {
-      const longEmail = 'a'.repeat(65) + '@' + 'b'.repeat(190) + '.com';
-      const result = validateEmail(longEmail, 'Email');
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Email local part is too long (maximum 64 characters)'
-      );
-    });
-
-    it('should handle required validation', () => {
-      const result = validateEmail('', 'Email', { required: true });
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Email is required');
-    });
-  });
-
-  describe('validatePhoneNumber', () => {
-    it('should validate valid phone number formats', () => {
-      const validPhones = [
-        '+1-555-123-4567',
-        '(555) 123-4567',
-        '555-123-4567',
-        '5551234567',
-        '+44 20 7946 0958',
-      ];
-
-      validPhones.forEach(phone => {
-        const result = validatePhoneNumber(phone, 'Phone Number');
-        expect(result.isValid).toBe(true);
-        expect(result.errors).toHaveLength(0);
-      });
-    });
-
-    it('should reject invalid phone numbers', () => {
-      const invalidPhones = [
-        '123',
-        'abcdefghij',
-        '555-123',
-        '+1-555-123-456789012345',
-      ];
-
-      invalidPhones.forEach(phone => {
-        const result = validatePhoneNumber(phone, 'Phone Number');
-        expect(result.isValid).toBe(false);
-      });
-    });
-
-    it('should validate minimum digit count', () => {
-      const result = validatePhoneNumber('123', 'Phone Number');
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Phone Number must be at least 7 digits');
-    });
-
-    it('should validate maximum digit count', () => {
-      const result = validatePhoneNumber('1234567890123456789', 'Phone Number');
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Phone Number is too long (maximum 15 digits)'
-      );
-    });
-  });
-
-  describe('validateName', () => {
-    it('should validate valid names', () => {
-      const validNames = [
-        'John Doe',
-        'Mary Jane',
-        'José García',
-        'Jean-Pierre',
-        "O'Connor",
-      ];
-
-      validNames.forEach(name => {
-        const result = validateName(name, 'Full Name');
-        expect(result.isValid).toBe(true);
-        expect(result.errors).toHaveLength(0);
-      });
-    });
-
-    it('should reject names with invalid characters', () => {
-      const invalidNames = [
-        'John123',
-        'Mary@Jane',
-        'José#García',
-        'Jean-Pierre!',
-      ];
-
-      invalidNames.forEach(name => {
-        const result = validateName(name, 'Full Name');
-        expect(result.isValid).toBe(false);
-      });
-    });
-
-    it('should reject names with consecutive spaces', () => {
-      const result = validateName('John  Doe', 'Full Name');
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Full Name cannot contain consecutive spaces'
-      );
-    });
-
-    it('should reject names that are too short', () => {
-      const result = validateName('A', 'Full Name');
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Full Name must be at least 2 characters'
-      );
-    });
-
-    it('should allow special characters when specified', () => {
-      const result = validateName('José García', 'Full Name', {
-        allowSpecialChars: true,
-      });
-      expect(result.isValid).toBe(true);
-    });
-  });
-
-  describe('validateNumber', () => {
-    it('should reject invalid numbers', () => {
-      const invalidNumbers = ['abc', '12a34', NaN];
-
-      invalidNumbers.forEach(num => {
-        const result = validateNumber(num, 'Number');
-        expect(result.isValid).toBe(false);
-        expect(result.errors).toContain('Number must be a valid number');
-      });
-    });
-
-    it('should validate range constraints', () => {
-      const result = validateNumber(25, 'Age', { minValue: 0, maxValue: 120 });
-      expect(result.isValid).toBe(true);
-
-      const tooLow = validateNumber(-5, 'Age', { minValue: 0 });
-      expect(tooLow.isValid).toBe(false);
-      expect(tooLow.errors).toContain('Age must be at least 0');
-
-      const tooHigh = validateNumber(150, 'Age', { maxValue: 120 });
-      expect(tooHigh.isValid).toBe(false);
-      expect(tooHigh.errors).toContain('Age must be no more than 120');
-    });
-
-    it('should validate decimal places', () => {
-      const result = validateNumber(3.14159, 'Pi', { decimalPlaces: 2 });
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Pi cannot have more than 2 decimal places'
-      );
-    });
-
-    it('should reject negative numbers when not allowed', () => {
-      const result = validateNumber(-5, 'Count', { allowNegative: false });
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Count cannot be negative');
-    });
-  });
-
-  describe('validateDate', () => {
-    it('should reject invalid dates', () => {
-      const invalidDates = ['invalid-date', '2023-13-45', 'not-a-date'];
-
-      invalidDates.forEach(date => {
-        const result = validateDate(date, 'Date');
-        expect(result.isValid).toBe(false);
-        expect(result.errors).toContain('Date must be a valid date');
-      });
-    });
-
-    it('should validate future/past date restrictions', () => {
-      const futureDate = new Date();
-      futureDate.setFullYear(futureDate.getFullYear() + 1);
-
-      const result = validateDate(futureDate, 'Date', { allowFuture: false });
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Date cannot be in the future');
-    });
-  });
-
-  describe('validateRequired', () => {
-    it('should validate required fields', () => {
-      const result = validateRequired('', 'Required Field');
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Required Field is required');
-    });
-
-    it('should pass validation for non-empty values', () => {
-      const result = validateRequired('valid value', 'Required Field');
-      expect(result.isValid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should apply custom validation', () => {
-      const customValidator = (value: any): ValidationResult => {
-        if (value.length < 5) {
-          return { isValid: false, errors: ['Value too short'] };
-        }
-        return { isValid: true, errors: [] };
-      };
-
-      const result = validateRequired('abc', 'Field', customValidator);
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Value too short');
-    });
-  });
-
-  describe('combineValidations', () => {
-    it('should combine multiple validation results', () => {
-      const validations = [
-        { isValid: true, errors: [] },
-        { isValid: false, errors: ['Error 1'] },
-        { isValid: false, errors: ['Error 2'] },
-      ];
-
-      const result = combineValidations(validations);
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Error 1');
-      expect(result.errors).toContain('Error 2');
-    });
-
-    it('should return valid when all validations pass', () => {
-      const validations = [
-        { isValid: true, errors: [] },
-        { isValid: true, errors: [] },
-      ];
-
-      const result = combineValidations(validations);
-      expect(result.isValid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should collect normalized values', () => {
-      const validations = [
-        { isValid: true, errors: [], normalizedValue: 'value1' },
-        { isValid: true, errors: [], normalizedValue: 'value2' },
-      ];
-
-      const result = combineValidations(validations);
-      expect(result.normalizedValue).toEqual({
-        field_0: 'value1',
-        field_1: 'value2',
-      });
-    });
-  });
-
-  describe('validateNameField', () => {
-    it('should validate valid name strings', () => {
-      const validNames = [
-        'John Doe',
-        'Mary Jane',
-        'José García',
-        'Jean-Pierre',
-        "O'Connor",
-        'Dr. Smith',
-      ];
-
-      validNames.forEach(name => {
-        const result = validateNameField(name, 'Full Name');
-        expect(result.isValid).toBe(true);
-        expect(result.errors).toHaveLength(0);
-      });
-    });
-
-    it('should reject numbers for name fields', () => {
-      const invalidNumbers = [123, 456, 0, -1, 3.14];
-
-      invalidNumbers.forEach(num => {
-        const result = validateNameField(num, 'Full Name');
-        expect(result.isValid).toBe(false);
-        expect(result.errors).toContain('Full Name must be text, not a number');
-      });
-    });
-
-    it('should reject names with invalid characters', () => {
-      const invalidNames = [
-        'John123',
-        'Mary@Jane',
-        'José#García',
-        'Jean-Pierre!',
-        'Name$',
-      ];
-
-      invalidNames.forEach(name => {
-        const result = validateNameField(name, 'Full Name');
-        expect(result.isValid).toBe(false);
-        expect(result.errors).toContain(
-          'Full Name can only contain letters, spaces, hyphens, apostrophes, and periods'
-        );
-      });
-    });
-
-    it('should reject names with consecutive spaces', () => {
-      const result = validateNameField('John  Doe', 'Full Name');
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Full Name cannot contain consecutive spaces'
-      );
-    });
-
-    it('should reject names that are too short', () => {
-      const result = validateNameField('A', 'Full Name');
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Full Name must be at least 2 characters'
-      );
-    });
-
-    it('should reject names that are too long', () => {
-      const longName = 'A'.repeat(101);
-      const result = validateNameField(longName, 'Full Name');
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain(
-        'Full Name is too long (maximum 100 characters)'
-      );
-    });
-
-    it('should handle required validation', () => {
-      const result = validateNameField('', 'Full Name', { required: true });
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Full Name is required');
-    });
-
-    it('should trim whitespace when trim option is true', () => {
-      const result = validateNameField('  John Doe  ', 'Full Name', {
-        trim: true,
-      });
-      expect(result.isValid).toBe(true);
-      expect(result.normalizedValue).toBe('John Doe');
-    });
-
-    it('should apply custom validation', () => {
-      const customValidator = (value: string): ValidationResult => {
-        if (value.length < 5) {
-          return { isValid: false, errors: ['Name too short'] };
-        }
-        return { isValid: true, errors: [] };
-      };
-
-      const result = validateNameField('John', 'Full Name', {
-        customValidator,
-      });
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Name too short');
-    });
-  });
-});
 
 
 
