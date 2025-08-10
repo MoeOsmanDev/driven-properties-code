@@ -1,0 +1,77 @@
+├── __tests__
+│   ├── components
+│   ├── hooks
+│   └── lib
+│       └── validation.test.ts
+├── .next
+├── .swc
+│   └── plugins
+│       └── v7_windows_x86_64_17.0.0
+├── app
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components
+│   ├── forms
+│   │   ├── animations
+│   │   │   └── slideVariants.ts
+│   │   ├── FormField
+│   │   │   ├── FormField.tsx
+│   │   │   ├── inputs
+│   │   │   │   ├── FieldGroup.tsx
+│   │   │   │   ├── InputCheckbox.tsx
+│   │   │   │   ├── InputDate.tsx
+│   │   │   │   ├── InputNumber.tsx
+│   │   │   │   ├── InputRadio.tsx
+│   │   │   │   ├── InputSelect.tsx
+│   │   │   │   ├── InputText.tsx
+│   │   │   │   └── UnsupportedField.tsx
+│   │   │   ├── types.ts
+│   │   │   └── UnsupportedField.tsx
+│   │   ├── FormNavigation
+│   │   │   ├── FormNavigation.tsx
+│   │   │   ├── NextIcon.tsx
+│   │   │   ├── PrevIcon.tsx
+│   │   │   └── SpinnerIcon.tsx
+│   │   ├── FormSteps.tsx
+│   │   ├── MultiStepForm.tsx
+│   │   ├── ReviewStep.tsx
+│   │   └── StepContent.tsx
+│   └── ui
+│       └── button.tsx
+├── eslint.config.mjs
+├── hooks
+│   └── useMultiStepForm.ts
+├── jest.config.js
+├── jest.setup.js
+├── lib
+│   ├── form-schema.json
+│   ├── schema-validator.ts
+│   ├── types.ts
+│   ├── utils.ts
+│   └── validation.ts
+├── next-env.d.ts
+├── next.config.ts
+├── node_modules
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── project-content.txt
+├── project-structure.txt
+├── public
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── next.svg
+│   ├── vercel.svg
+│   └── window.svg
+├── README.md
+├── scripts
+│   ├── generateContent.js
+│   └── generateStructure.js
+├── structureGeneration.ts
+├── tailwind.config.js
+├── tsconfig.json
+├── tsconfig.scripts.json
+└── validations
+    └── form-schemas.ts

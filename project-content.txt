@@ -1,0 +1,3530 @@
+----- FILE: app\globals.css -----
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+
+
+----- FILE: app\layout.tsx -----
+
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'Multi-Step Form - Next.js 15',
+  description: 'Advanced schema-driven multi-step form with TypeScript',
+};
+
+/**
+ * Root layout component for the Next.js application
+ * Provides global styling and font configuration
+ */
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang='en'>
+      <body className={inter.className}>
+        <main className='min-h-screen bg-gradient-to-br from-slate-50 to-slate-100'>
+          {children}
+        </main>
+      </body>
+    </html>
+  );
+}
+
+
+
+----- FILE: app\page.tsx -----
+
+import { MultiStepForm } from '@/components/forms/MultiStepForm';
+
+export default function Home() {
+  return (
+    <div className='w-full min-h-screen px-3 sm:px-4 py-6 sm:py-8 bg-gradient-to-br from-cyan-700 via-cyan-100 to-slate-900'>
+      <div className='w-full max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto'>
+        <div className='text-center mb-6 sm:mb-8'>
+          <h1 className='text-2xl sm:text-3xl font-bold text-gray-900 mb-2'>
+            Property Registration
+          </h1>
+          <p className='text-sm sm:text-base text-gray-700'>
+            Complete your property registration in a few simple steps
+          </p>
+        </div>
+        <MultiStepForm />
+      </div>
+    </div>
+  );
+}
+
+
+
+----- FILE: components\forms\animations\slideVariants.ts -----
+
+export const slideVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? 300 : -300,
+    opacity: 0,
+  }),
+  center: {
+    zIndex: 1,
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    zIndex: 0,
+    x: direction < 0 ? 300 : -300,
+    opacity: 0,
+  }),
+};
+
+
+
+----- FILE: components\forms\FormField\FormField.tsx -----
+
+'use client';
+
+import React from 'react';
+import { SchemaValidator } from '../../../lib/schema-validator';
+
+import { FieldGroup } from './inputs/FieldGroup';
+import { InputCheckbox } from './inputs/InputCheckbox';
+import { InputDate } from './inputs/InputDate';
+import { InputNumber } from './inputs/InputNumber';
+import { InputRadio } from './inputs/InputRadio';
+import { InputSelect } from './inputs/InputSelect';
+import { InputText } from './inputs/InputText';
+import { UnsupportedField } from './UnsupportedField';
+
+import { FormFieldProps } from './types';
+
+/**
+ * Dynamic form field component that renders different input types based on field schema
+ *
+ * This component is the core building block of the form system, responsible for:
+ * - Rendering appropriate input components based on field type
+ * - Handling field visibility based on dependencies
+ * - Managing field value retrieval and updates
+ * - Displaying validation errors
+ * - Supporting nested field structures (groups)
+ *
+ * The component automatically determines which input component to render based on
+ * the field.type property and provides consistent error handling and styling.
+ *
+ * @param props - Component properties
+ * @param props.field - Field schema defining the input type, validation, and display options
+ * @param props.formData - Current form data for value retrieval and dependency evaluation
+ * @param props.onUpdate - Callback function called when field value changes
+ * @param props.errors - Validation errors object mapping field paths to error messages
+ * @param props.parentPath - Optional parent path for nested fields (e.g., 'address.city')
+ *
+ * @example
+ * ```typescript
+ * <FormField
+ *   field={{
+ *     key: 'firstName',
+ *     label: 'First Name',
+ *     type: 'text',
+ *     required: true
+ *   }}
+ *   formData={formData}
+ *   onUpdate={updateField}
+ *   errors={errors}
+ * />
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Nested field example
+ * <FormField
+ *   field={{
+ *     key: 'address',
+ *     label: 'Address',
+ *     type: 'group',
+ *     fields: [
+ *       { key: 'street', label: 'Street', type: 'text', required: true },
+ *       { key: 'city', label: 'City', type: 'text', required: true }
+ *     ]
+ *   }}
+ *   formData={formData}
+ *   onUpdate={updateField}
+ *   errors={errors}
+ *   parentPath="contact"
+ * />
+ * ```
+ */
+export const FormField: React.FC<FormFieldProps> = ({
+  field,
+  formData,
+  onUpdate,
+  errors,
+  parentPath = '',
+}) => {
+  /* -------------------------
+      1. Derived identifiers
+   ------------------------- */
+  /** Full field path including parent path for nested fields */
+  const fieldPath = parentPath ? `${parentPath}.${field.key}` : field.key;
+
+  /* -------------------------
+       2. Field visibility & options
+   ------------------------- */
+  /** Whether the field should be visible based on dependencies */
+  const isVisible = SchemaValidator.isFieldVisible(field, formData);
+
+  /** Available options for select/radio fields */
+  const fieldOptions = SchemaValidator.getFieldOptions(field, formData);
+
+  /* -------------------------
+       3. Get field value & error
+   ------------------------- */
+  /**
+   * Retrieves nested values from form data using dot notation
+   *
+   * @param path - Dot-notation path (e.g., 'address.city')
+   * @returns The value at the specified path, or undefined if not found
+   */
+  const getValue = (path: string) => {
+    if (!formData || typeof formData !== 'object') {
+      return undefined;
+    }
+    return path.split('.').reduce((current, key) => {
+      if (current && typeof current === 'object' && key in current) {
+        return current[key];
+      }
+      return undefined;
+    }, formData);
+  };
+
+  /** Current value of the field */
+  const value = getValue(fieldPath);
+  /** Validation error for the field, if any */
+  const error =
+    errors && typeof errors === 'object' ? errors[fieldPath] : undefined;
+
+  /* -------------------------
+       4. Visibility check
+   ------------------------- */
+  if (!isVisible) return null;
+
+  /* -------------------------
+       5. Change handler
+   ------------------------- */
+  /**
+   * Handles field value changes and notifies parent component
+   * Includes validation to ensure name fields only accept strings
+   *
+   * @param newValue - New value for the field
+   */
+  const handleChange = (newValue: any) => {
+    try {
+      // Ensure text fields always receive string values
+      if (field.type === 'text') {
+        // Convert to string if it's not already
+        if (typeof newValue !== 'string') {
+          newValue = String(newValue);
+        }
+      }
+
+      // Call onUpdate only if it's a valid function
+      if (typeof onUpdate === 'function') {
+        onUpdate(fieldPath, newValue);
+      }
+    } catch (error) {
+      console.error('Error in handleChange:', error);
+    }
+  };
+
+  /* -------------------------
+       6. Field rendering logic
+   ------------------------- */
+  /**
+   * Renders the appropriate input component based on field type
+   *
+   * Each field type has its own specialized input component with
+   * appropriate props and validation handling.
+   *
+   * @returns React element representing the input field
+   */
+  const renderField = () => {
+    switch (field.type) {
+      case 'text':
+        return (
+          <InputText
+            id={fieldPath}
+            defaultValue={typeof value === 'string' ? value : ''}
+            onCommit={handleChange}
+            placeholder={`Enter ${field.label.toLowerCase()}`}
+            autoComplete={field.key === 'email' ? 'email' : 'off'}
+            error={Boolean(error)}
+          />
+        );
+
+      case 'number':
+        return (
+          <InputNumber
+            id={fieldPath}
+            value={
+              typeof value === 'number' || typeof value === 'string'
+                ? value
+                : ''
+            }
+            onChange={handleChange}
+            placeholder={`Enter ${field.label.toLowerCase()}`}
+            error={Boolean(error)}
+          />
+        );
+
+      case 'select':
+        return (
+          <InputSelect
+            id={fieldPath}
+            value={typeof value === 'string' ? value : ''}
+            options={fieldOptions}
+            onChange={handleChange}
+            placeholder={`Select ${field.label.toLowerCase()}`}
+            error={Boolean(error)}
+          />
+        );
+
+      case 'checkbox':
+        return (
+          <InputCheckbox
+            id={fieldPath}
+            label={field.label}
+            checked={Boolean(value)}
+            onChange={handleChange}
+          />
+        );
+
+      case 'radio':
+        return (
+          <InputRadio
+            name={fieldPath}
+            selectedValue={typeof value === 'string' ? value : ''}
+            options={fieldOptions}
+            onChange={handleChange}
+          />
+        );
+
+      case 'date':
+        return (
+          <InputDate
+            id={fieldPath}
+            value={typeof value === 'string' ? value : ''}
+            onChange={handleChange}
+            error={Boolean(error)}
+          />
+        );
+
+      case 'group':
+        return (
+          <FieldGroup
+            label={field.label}
+            fields={field.fields ?? []}
+            formData={formData}
+            onUpdate={onUpdate}
+            errors={errors}
+            parentPath={fieldPath}
+          />
+        );
+
+      default:
+        return <UnsupportedField type={field.type} />;
+    }
+  };
+
+  /* -------------------------
+       7. Render wrapper
+   ------------------------- */
+  if (field.type === 'group') {
+    return <div className='space-y-4'>{renderField()}</div>;
+  }
+
+  return (
+    <div className='space-y-2'>
+      {field.type !== 'checkbox' && (
+        <label
+          htmlFor={fieldPath}
+          className='block text-sm font-medium leading-6 text-gray-900'
+        >
+          {field.label}
+          {field.required && <span className='text-red-500 ml-1'>*</span>}
+        </label>
+      )}
+
+      {renderField()}
+
+      {error && <p className='text-sm text-red-600'>{error}</p>}
+    </div>
+  );
+};
+
+
+
+----- FILE: components\forms\FormField\inputs\FieldGroup.tsx -----
+
+'use client';
+
+import { FormData, FormField as FormFieldType } from '@/lib/types';
+import React from 'react';
+import { FormField } from '../FormField';
+
+interface FieldGroupProps {
+  label: string;
+  fields: FormFieldType[];
+  formData: FormData;
+  onUpdate: (key: string, value: any) => void;
+  errors: Record<string, string>;
+  parentPath?: string;
+}
+
+/**
+ * Container component for grouping related form fields together
+ *
+ * This component creates a visual and logical grouping of form fields,
+ * typically used for related information like address details, contact
+ * information, or any set of fields that belong together. It provides:
+ * - A clear visual boundary with background and border styling
+ * - A group label to identify the purpose of the contained fields
+ * - Proper spacing and layout for grouped fields
+ * - Nested field path management for form data structure
+ *
+ * The component automatically handles nested field paths by prepending
+ * the group key to child field keys (e.g., 'address.street', 'address.city').
+ *
+ * @param props - Component properties
+ * @param props.label - Human-readable label for the field group
+ * @param props.fields - Array of form fields to render within the group
+ * @param props.formData - Current form data for field values and validation
+ * @param props.onUpdate - Function to update field values
+ * @param props.errors - Validation errors for display
+ * @param props.parentPath - Optional parent path for nested field structure
+ *
+ * @example
+ * ```typescript
+ * <FieldGroup
+ *   label="Address Information"
+ *   fields={[
+ *     { key: 'street', label: 'Street', type: 'text', required: true },
+ *     { key: 'city', label: 'City', type: 'text', required: true },
+ *     { key: 'zipCode', label: 'ZIP Code', type: 'text', required: true }
+ *   ]}
+ *   formData={formData}
+ *   onUpdate={updateField}
+ *   errors={errors}
+ *   parentPath="contact"
+ * />
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Without parent path (top-level group)
+ * <FieldGroup
+ *   label="Personal Details"
+ *   fields={[
+ *     { key: 'firstName', label: 'First Name', type: 'text', required: true },
+ *     { key: 'lastName', label: 'Last Name', type: 'text', required: true }
+ *   ]}
+ *   formData={formData}
+ *   onUpdate={updateField}
+ *   errors={errors}
+ * />
+ * ```
+ */
+export const FieldGroup: React.FC<FieldGroupProps> = ({
+  label,
+  fields,
+  formData,
+  onUpdate,
+  errors,
+  parentPath,
+}) => {
+  return (
+    <div className='space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50'>
+      {/* Group header */}
+      <h3 className='text-lg font-medium text-gray-900'>{label}</h3>
+
+      {/* Grouped fields */}
+      <div className='space-y-4'>
+        {fields.map(field => (
+          <FormField
+            key={field.key}
+            field={field}
+            formData={formData}
+            onUpdate={onUpdate}
+            errors={errors}
+            parentPath={parentPath}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+
+
+----- FILE: components\forms\FormField\inputs\InputCheckbox.tsx -----
+
+'use client';
+
+import React from 'react';
+
+interface InputCheckboxProps {
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
+export const InputCheckbox: React.FC<InputCheckboxProps> = ({
+  id,
+  label,
+  checked,
+  onChange,
+}) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(event.target.checked);
+  };
+
+  return (
+    <div className='flex items-center'>
+      <input
+        type='checkbox'
+        id={id}
+        checked={checked}
+        onChange={handleChange}
+        className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+      />
+      <label
+        htmlFor={id}
+        className='ml-2 block text-sm text-gray-900 cursor-pointer'
+      >
+        {label}
+      </label>
+    </div>
+  );
+};
+
+
+
+----- FILE: components\forms\FormField\inputs\InputDate.tsx -----
+
+'use client';
+
+import React from 'react';
+
+interface InputDateProps {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: boolean;
+}
+
+export const InputDate: React.FC<InputDateProps> = ({
+  id,
+  value,
+  onChange,
+  error,
+}) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(event.target.value);
+  };
+
+  return (
+    <input
+      type='date'
+      id={id}
+      value={value}
+      onChange={handleChange}
+      className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 ${
+        error ? 'ring-red-500 focus:ring-red-500' : ''
+      }`}
+    />
+  );
+};
+
+
+
+----- FILE: components\forms\FormField\inputs\InputNumber.tsx -----
+
+'use client';
+
+import React from 'react';
+
+interface InputNumberProps {
+  id: string;
+  value: string | number;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  error?: boolean;
+}
+
+export const InputNumber: React.FC<InputNumberProps> = ({
+  id,
+  value,
+  onChange,
+  placeholder,
+  error,
+}) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(event.target.value);
+  };
+
+  return (
+    <input
+      type='number'
+      id={id}
+      value={value}
+      onChange={handleChange}
+      placeholder={placeholder}
+      className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-2 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 ${
+        error ? 'ring-red-500 focus:ring-red-500' : ''
+      }`}
+    />
+  );
+};
+
+
+
+----- FILE: components\forms\FormField\inputs\InputRadio.tsx -----
+
+'use client';
+
+import React from 'react';
+
+interface InputRadioProps {
+  name: string;
+  selectedValue: string;
+  options: string[];
+  onChange: (value: string) => void;
+}
+
+export const InputRadio: React.FC<InputRadioProps> = ({
+  name,
+  selectedValue,
+  options,
+  onChange,
+}) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(event.target.value);
+  };
+
+  return (
+    <div className='space-y-2'>
+      {options.map(option => (
+        <div key={option} className='flex items-center'>
+          <input
+            type='radio'
+            id={`${name}-${option}`}
+            name={name}
+            value={option}
+            checked={selectedValue === option}
+            onChange={handleChange}
+            className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300'
+          />
+          <label
+            htmlFor={`${name}-${option}`}
+            className='ml-2 block text-sm text-gray-900 cursor-pointer'
+          >
+            {option}
+          </label>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+
+
+----- FILE: components\forms\FormField\inputs\InputSelect.tsx -----
+
+'use client';
+
+import React from 'react';
+
+interface InputSelectProps {
+  id: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  error?: boolean;
+}
+
+export const InputSelect: React.FC<InputSelectProps> = ({
+  id,
+  value,
+  options,
+  onChange,
+  placeholder,
+  error,
+}) => {
+  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    onChange(event.target.value);
+  };
+
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={handleChange}
+      className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-1 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 ${
+        error ? 'ring-red-500 focus:ring-red-500' : ''
+      }`}
+    >
+      {placeholder && (
+        <option value='' disabled>
+          {placeholder}
+        </option>
+      )}
+      {options.map(option => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+  );
+};
+
+
+
+----- FILE: components\forms\FormField\inputs\InputText.tsx -----
+
+'use client';
+
+import React from 'react';
+
+interface InputTextProps {
+  id: string;
+  defaultValue?: string;
+  onCommit: (value: string) => void;
+  placeholder?: string;
+  autoComplete?: string;
+  error?: boolean;
+}
+
+/**
+ * Text input component for form fields
+ *
+ * This component provides a controlled text input with immediate value
+ * commitment and comprehensive styling. It's designed for use within
+ * the FormField system and provides:
+ * - Immediate value updates as the user types
+ * - Value commitment on blur for better UX
+ * - Error state styling with visual indicators
+ * - Accessibility features (labels, autoComplete)
+ * - Responsive design with Tailwind CSS
+ *
+ * The component uses a controlled input pattern where the internal
+ * state is managed locally but changes are immediately propagated
+ * to the parent form via the onCommit callback.
+ *
+ * @param props - Component properties
+ * @param props.id - Unique identifier for the input field
+ * @param props.defaultValue - Initial value for the input field
+ * @param props.onCommit - Callback function called when value changes or field loses focus
+ * @param props.placeholder - Placeholder text displayed when field is empty
+ * @param props.autoComplete - HTML autocomplete attribute value
+ * @param props.error - Whether to display error styling
+ *
+ * @example
+ * ```typescript
+ * <InputText
+ *   id="firstName"
+ *   defaultValue="John"
+ *   onCommit={(value) => updateField('firstName', value)}
+ *   placeholder="Enter your first name"
+ *   autoComplete="given-name"
+ *   error={Boolean(errors.firstName)}
+ * />
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Email field with email autocomplete
+ * <InputText
+ *   id="email"
+ *   defaultValue=""
+ *   onCommit={(value) => updateField('email', value)}
+ *   placeholder="Enter your email address"
+ *   autoComplete="email"
+ *   error={Boolean(errors.email)}
+ * />
+ * ```
+ */
+export const InputText: React.FC<InputTextProps> = ({
+  id,
+  defaultValue = '',
+  onCommit,
+  placeholder,
+  autoComplete = 'off',
+  error,
+}) => {
+  /** Internal state for the input value */
+  const [inputValue, setInputValue] = React.useState(defaultValue);
+
+  /**
+   * Handles input value changes
+   *
+   * Updates the internal state and immediately commits the new value
+   * to the parent form for real-time validation and data management.
+   *
+   * @param event - Change event from the input element
+   */
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = event.target.value;
+    setInputValue(newValue);
+    onCommit(newValue); // Immediately commit the value to parent form
+  };
+
+  /**
+   * Handles input blur events
+   *
+   * Commits the current input value when the user leaves the field,
+   * ensuring the final value is captured even if it hasn't changed
+   * since the last keystroke.
+   */
+  const handleBlur = () => {
+    onCommit(inputValue); // Also commit when leaving the field
+  };
+
+  /**
+   * Syncs internal state with external defaultValue changes
+   *
+   * This effect ensures that if the defaultValue prop changes
+   * (e.g., from form reset), the internal state is updated accordingly.
+   */
+  React.useEffect(() => {
+    setInputValue(defaultValue);
+  }, [defaultValue]);
+
+  return (
+    <input
+      type='text'
+      id={id}
+      value={inputValue}
+      onChange={handleChange}
+      placeholder={placeholder}
+      autoComplete={autoComplete}
+      onBlur={handleBlur}
+      className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 px-2 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 ${
+        error ? 'ring-red-500 focus:ring-red-500' : ''
+      }`}
+    />
+  );
+};
+
+
+
+----- FILE: components\forms\FormField\inputs\UnsupportedField.tsx -----
+
+'use client';
+
+import React from 'react';
+
+interface UnsupportedFieldProps {
+  type: string;
+}
+
+export const UnsupportedField: React.FC<UnsupportedFieldProps> = ({ type }) => {
+  return <div className='text-red-500'>Unsupported field type: {type}</div>;
+};
+
+
+
+----- FILE: components\forms\FormField\types.ts -----
+
+import { FormData, FormField as FormFieldType } from '../../../lib/types';
+
+export interface FormFieldProps {
+  field: FormFieldType;
+  formData: FormData;
+  onUpdate: (key: string, value: any) => void;
+  errors: Record<string, string>;
+  parentPath?: string;
+}
+
+
+
+----- FILE: components\forms\FormField\UnsupportedField.tsx -----
+
+'use client';
+
+import React from 'react';
+
+interface UnsupportedFieldProps {
+  type: string;
+}
+
+/**
+ * Fallback component for unsupported field types
+ *
+ * This component is displayed when a form field has a type that is not
+ * yet implemented in the form system. It provides a user-friendly
+ * warning message with visual indicators to help developers identify
+ * missing field type implementations.
+ *
+ * The component uses a yellow warning style to clearly indicate that
+ * this is a development issue that needs attention, while still
+ * allowing the form to render without crashing.
+ *
+ * @param props - Component properties
+ * @param props.type - The unsupported field type that triggered this component
+ *
+ * @example
+ * ```typescript
+ * // This would render if a field has type: 'file' which isn't implemented
+ * <UnsupportedField type="file" />
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // This would render if a field has type: 'textarea' which isn't implemented
+ * <UnsupportedField type="textarea" />
+ * ```
+ */
+export const UnsupportedField: React.FC<UnsupportedFieldProps> = ({ type }) => {
+  return (
+    <div className='p-4 bg-yellow-50 border border-yellow-200 rounded-lg'>
+      <div className='flex items-center'>
+        {/* Warning icon */}
+        <svg
+          className='w-5 h-5 text-yellow-600 mr-2'
+          fill='currentColor'
+          viewBox='0 0 20 20'
+        >
+          <path
+            fillRule='evenodd'
+            d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
+            clipRule='evenodd'
+          />
+        </svg>
+
+        {/* Warning message */}
+        <span className='text-sm text-yellow-800'>
+          Field type "{type}" is not supported yet.
+        </span>
+      </div>
+    </div>
+  );
+};
+
+
+
+----- FILE: components\forms\FormNavigation\FormNavigation.tsx -----
+
+'use client';
+
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import React from 'react';
+import { NextIcon } from './NextIcon';
+import { PrevIcon } from './PrevIcon';
+import { SpinnerIcon } from './SpinnerIcon';
+import { FormNavigationProps } from './types';
+
+export const FormNavigation: React.FC<FormNavigationProps> = ({
+  currentStep,
+  totalSteps,
+  canGoPrev,
+  canGoNext,
+  onPrev,
+  onNext,
+  onSubmit,
+  isLoading = false,
+}) => {
+  const isLastStep = currentStep === totalSteps - 1;
+  const [isNavigating, setIsNavigating] = React.useState(false);
+
+  const handleNext = async () => {
+    setIsNavigating(true);
+    try {
+      if (isLastStep) {
+        await onSubmit();
+      } else {
+        await onNext();
+      }
+    } finally {
+      setIsNavigating(false);
+    }
+  };
+
+  return (
+    <div className='flex items-center justify-between pt-8 border-t border-gray-200'>
+      <Button
+        type='button'
+        variant='outline'
+        onClick={onPrev}
+        disabled={!canGoPrev || isLoading || isNavigating}
+        className='flex items-center gap-2'
+      >
+        <PrevIcon />
+        Previous
+      </Button>
+
+      <div className='flex items-center gap-2 text-sm text-gray-500'>
+        Step {currentStep + 1} of {totalSteps}
+      </div>
+
+      <Button
+        type='button'
+        onClick={handleNext}
+        disabled={(!canGoNext && !isLastStep) || isLoading || isNavigating}
+        className={cn(
+          'flex items-center gap-2 min-w-[120px]',
+          isLastStep && 'bg-green-600 hover:bg-green-700'
+        )}
+      >
+        {isNavigating ? (
+          <>
+            <SpinnerIcon />
+            {isLastStep ? 'Submitting...' : 'Processing...'}
+          </>
+        ) : (
+          <>
+            {isLastStep ? 'Submit' : 'Next'}
+            {!isLastStep && <NextIcon />}
+          </>
+        )}
+      </Button>
+    </div>
+  );
+};
+
+
+
+----- FILE: components\forms\FormNavigation\NextIcon.tsx -----
+
+export const NextIcon = () => (
+  <svg
+    className='w-4 h-4'
+    fill='none'
+    stroke='currentColor'
+    viewBox='0 0 24 24'
+  >
+    <path
+      strokeLinecap='round'
+      strokeLinejoin='round'
+      strokeWidth={2}
+      d='M9 5l7 7-7 7'
+    />
+  </svg>
+);
+
+
+
+----- FILE: components\forms\FormNavigation\PrevIcon.tsx -----
+
+export const PrevIcon = () => (
+  <svg
+    className='w-4 h-4'
+    fill='none'
+    stroke='currentColor'
+    viewBox='0 0 24 24'
+  >
+    <path
+      strokeLinecap='round'
+      strokeLinejoin='round'
+      strokeWidth={2}
+      d='M15 19l-7-7 7-7'
+    />
+  </svg>
+);
+
+
+
+----- FILE: components\forms\FormNavigation\SpinnerIcon.tsx -----
+
+export const SpinnerIcon = () => (
+  <svg className='animate-spin w-4 h-4' fill='none' viewBox='0 0 24 24'>
+    <circle
+      className='opacity-25'
+      cx='12'
+      cy='12'
+      r='10'
+      stroke='currentColor'
+      strokeWidth='4'
+    ></circle>
+    <path
+      className='opacity-75'
+      fill='currentColor'
+      d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+    ></path>
+  </svg>
+);
+
+
+
+----- FILE: components\forms\FormSteps.tsx -----
+
+'use client';
+
+import { cn } from '@/lib/utils';
+import React from 'react';
+
+interface FormStepsProps {
+  steps: Array<{ title: string }>;
+  currentStep: number;
+}
+
+/**
+ * Progress indicator component showing the current step
+ * and progress through the multi-step form
+ */
+export const FormSteps: React.FC<FormStepsProps> = ({ steps, currentStep }) => {
+  return (
+    <nav aria-label='Progress' className='mb-8'>
+      <ol role='list' className='flex items-center justify-between'>
+        {steps.map((step, index) => (
+          <li
+            key={step.title}
+            className={cn(
+              'flex items-center',
+              index < steps.length - 1 ? 'flex-1' : ''
+            )}
+          >
+            <div className='flex items-center'>
+              {/* Step indicator */}
+              <div
+                className={cn(
+                  'flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition-all duration-200',
+                  currentStep > index
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : currentStep === index
+                    ? 'border-blue-600 bg-white text-blue-600'
+                    : 'border-gray-300 bg-white text-black'
+                )}
+              >
+                {currentStep > index ? (
+                  <svg
+                    className='h-5 w-5'
+                    fill='currentColor'
+                    viewBox='0 0 20 20'
+                  >
+                    <path
+                      fillRule='evenodd'
+                      d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
+                      clipRule='evenodd'
+                    />
+                  </svg>
+                ) : (
+                  <span>{index + 1}</span>
+                )}
+              </div>
+
+              {/* Step title */}
+              <div className='ml-4 min-w-0'>
+                <span
+                  className={cn(
+                    'text-sm font-medium transition-colors duration-200',
+                    currentStep >= index ? 'text-black' : 'text-gray-600'
+                  )}
+                >
+                  {step.title}
+                </span>
+              </div>
+            </div>
+
+            {/* Connector line */}
+            {index < steps.length - 1 && (
+              <div
+                className={cn(
+                  'ml-4 h-0.5 w-full transition-colors duration-200',
+                  currentStep > index ? 'bg-blue-600' : 'bg-gray-300'
+                )}
+              />
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+};
+
+
+
+----- FILE: components\forms\MultiStepForm.tsx -----
+
+'use client';
+
+import { useMultiStepForm } from '@/hooks/useMultiStepForm';
+import rawFormSchema from '@/lib/form-schema.json';
+import { FormSchema } from '@/lib/types';
+import { AnimatePresence, motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { slideVariants } from './animations/slideVariants';
+import { FormNavigation } from './FormNavigation/FormNavigation';
+import { FormSteps } from './FormSteps';
+import { ReviewStep } from './ReviewStep';
+import { StepContent } from './StepContent';
+
+export const MultiStepForm: React.FC = () => {
+  const {
+    currentStep,
+    totalSteps,
+    formData,
+    errors,
+    nextStep,
+    prevStep,
+    updateField,
+    submitForm,
+    canGoNext,
+    canGoPrev,
+  } = useMultiStepForm(rawFormSchema as FormSchema);
+
+  const formSchema = rawFormSchema as FormSchema;
+  const currentStepData = formSchema.steps[currentStep];
+  const isReviewStep = currentStep === totalSteps - 1;
+
+  const [direction, setDirection] = useState(0);
+
+  const handleNext = async () => {
+    setDirection(1);
+    return await nextStep();
+  };
+
+  const handlePrev = () => {
+    setDirection(-1);
+    prevStep();
+  };
+
+  return (
+    <div className='w-full max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden'>
+      {/* Steps Header */}
+      <div className='px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 bg-gradient-to-r from-cyan-400 via-cyan-700 to-cyan-700'>
+        <FormSteps steps={formSchema.steps} currentStep={currentStep} />
+      </div>
+
+      {/* Form Content */}
+      <div className='p-4 sm:p-6 md:p-8'>
+        <AnimatePresence mode='wait' custom={direction}>
+          <motion.div
+            key={currentStep}
+            custom={direction}
+            variants={slideVariants}
+            initial='enter'
+            animate='center'
+            exit='exit'
+            transition={{
+              x: { type: 'spring', stiffness: 300, damping: 30 },
+              opacity: { duration: 0.2 },
+            }}
+            className='min-h-[300px] sm:min-h-[350px] md:min-h-[400px]'
+          >
+            {isReviewStep ? (
+              <ReviewStep formSchema={formSchema} formData={formData} />
+            ) : (
+              <StepContent
+                currentStepData={currentStepData}
+                currentStep={currentStep}
+                totalSteps={totalSteps}
+                formData={formData}
+                updateField={updateField}
+                errors={errors}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Navigation */}
+        <FormNavigation
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onSubmit={submitForm}
+        />
+      </div>
+    </div>
+  );
+};
+
+
+
+----- FILE: components\forms\ReviewStep.tsx -----
+
+import { FormSchema } from '@/lib/types';
+import React from 'react';
+
+interface ReviewStepProps {
+  formSchema: FormSchema;
+  formData: Record<string, any>;
+}
+
+export const ReviewStep: React.FC<ReviewStepProps> = ({
+  formSchema,
+  formData,
+}) => (
+  <div className='space-y-8'>
+    <div className='text-center'>
+      <h2 className='text-2xl font-bold text-gray-900 mb-2'>
+        Review Your Information
+      </h2>
+      <p className='text-gray-600'>
+        Please review all the information before submitting
+      </p>
+    </div>
+
+    <div className='bg-white rounded-lg border border-gray-200 overflow-hidden'>
+      {formSchema.steps.slice(0, -1).map((step, stepIndex) => (
+        <div
+          key={stepIndex}
+          className='p-6 border-b border-gray-100 last:border-b-0'
+        >
+          <h3 className='text-lg font-semibold text-gray-900 mb-4'>
+            {step.title}
+          </h3>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            {step.fields.map(field => {
+              const renderFieldValue = (field: any, parentPath = '') => {
+                const fieldPath = parentPath
+                  ? `${parentPath}.${field.key}`
+                  : field.key;
+                const value = fieldPath
+                  .split('.')
+                  .reduce(
+                    (current: { [x: string]: any }, key: string | number) =>
+                      current?.[key],
+                    formData
+                  );
+
+                if (field.type === 'group' && field.fields) {
+                  return (
+                    <div key={field.key} className='col-span-full'>
+                      <h4 className='font-medium text-gray-900 mb-2'>
+                        {field.label}
+                      </h4>
+                      <div className='grid grid-cols-1 md:grid-cols-2 gap-2 ml-4'>
+                        {field.fields.map((subField: any) =>
+                          renderFieldValue(subField, fieldPath)
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (value === undefined || value === null || value === '') {
+                  return null;
+                }
+
+                return (
+                  <div key={fieldPath} className='space-y-1'>
+                    <dt className='text-sm font-medium text-gray-600'>
+                      {field.label}
+                    </dt>
+                    <dd className='text-sm text-gray-900'>
+                      {field.type === 'checkbox'
+                        ? value
+                          ? 'Yes'
+                          : 'No'
+                        : String(value)}
+                    </dd>
+                  </div>
+                );
+              };
+
+              return renderFieldValue(field);
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
+      <div className='flex items-center'>
+        <svg
+          className='w-5 h-5 text-blue-600 mr-2'
+          fill='currentColor'
+          viewBox='0 0 20 20'
+        >
+          <path
+            fillRule='evenodd'
+            d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z'
+            clipRule='evenodd'
+          />
+        </svg>
+        <p className='text-sm text-blue-800'>
+          By submitting this form, you confirm that all information provided is
+          accurate and complete.
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
+
+
+----- FILE: components\forms\StepContent.tsx -----
+
+import { FormData, FormStep } from '@/lib/types';
+import React from 'react';
+import { FormField } from './FormField/FormField';
+
+interface StepContentProps {
+  currentStepData: FormStep;
+  currentStep: number;
+  totalSteps: number;
+  formData: FormData;
+  updateField: (key: string, value: any) => void;
+  errors: Record<string, string>;
+}
+
+/**
+ * Renders the content for a specific step in the multi-step form
+ *
+ * This component is responsible for displaying the current step's fields,
+ * step information, and validation errors. It serves as the main content
+ * area for each step, rendering individual FormField components for each
+ * field defined in the step schema.
+ *
+ * The component provides:
+ * - Step title and progress indicator
+ * - Dynamic field rendering based on step schema
+ * - Comprehensive error display with visual indicators
+ * - Consistent layout and styling for all steps
+ *
+ * @param props - Component properties
+ * @param props.currentStepData - Schema definition for the current step
+ * @param props.currentStep - Current step index (0-based)
+ * @param props.totalSteps - Total number of steps in the form
+ * @param props.formData - Current form data for field values and validation
+ * @param props.updateField - Function to update field values
+ * @param props.errors - Validation errors for display
+ *
+ * @example
+ * ```typescript
+ * <StepContent
+ *   currentStepData={formSchema.steps[0]}
+ *   currentStep={0}
+ *   totalSteps={3}
+ *   formData={formData}
+ *   updateField={updateField}
+ *   errors={errors}
+ * />
+ * ```
+ */
+export const StepContent: React.FC<StepContentProps> = ({
+  currentStepData,
+  currentStep,
+  totalSteps,
+  formData,
+  updateField,
+  errors,
+}) => {
+  return (
+    <div className='space-y-8'>
+      {/* Step header with title and progress indicator */}
+      <div className='text-center'>
+        <h2 className='text-2xl font-bold text-gray-900 mb-2'>
+          {currentStepData.title}
+        </h2>
+        <p className='text-gray-600'>
+          Step {currentStep + 1} of {totalSteps - 1}
+        </p>
+      </div>
+
+      {/* Form fields for the current step */}
+      <div className='space-y-6'>
+        {currentStepData.fields.map(field => (
+          <FormField
+            key={field.key}
+            field={field}
+            formData={formData}
+            onUpdate={updateField}
+            errors={errors}
+          />
+        ))}
+      </div>
+
+      {/* Error summary display */}
+      {Object.keys(errors).length > 0 && (
+        <div className='bg-red-50 border border-red-200 rounded-lg p-4'>
+          <div className='flex items-center mb-2'>
+            <svg
+              className='w-5 h-5 text-red-600 mr-2'
+              fill='currentColor'
+              viewBox='0 0 20 20'
+            >
+              <path
+                fillRule='evenodd'
+                d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z'
+                clipRule='evenodd'
+              />
+            </svg>
+            <h3 className='text-sm font-medium text-red-800'>
+              Please correct the following errors:
+            </h3>
+          </div>
+          <ul className='list-disc list-inside text-sm text-red-700 space-y-1'>
+            {Object.values(errors).map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+----- FILE: components\ui\button.tsx -----
+
+'use client';
+
+import { cn } from '@/lib/utils';
+import React from 'react';
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?:
+    | 'default'
+    | 'destructive'
+    | 'outline'
+    | 'secondary'
+    | 'ghost'
+    | 'link';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+}
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant = 'default', size = 'default', ...props }, ref) => {
+    return (
+      <button
+        className={cn(
+          'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+          {
+            'bg-primary text-primary-foreground hover:bg-primary/90':
+              variant === 'default',
+            'bg-destructive text-destructive-foreground hover:bg-destructive/90':
+              variant === 'destructive',
+            'border border-input bg-background hover:bg-accent hover:text-accent-foreground':
+              variant === 'outline',
+            'bg-secondary text-secondary-foreground hover:bg-secondary/80':
+              variant === 'secondary',
+            'hover:bg-accent hover:text-accent-foreground': variant === 'ghost',
+            'text-primary underline-offset-4 hover:underline':
+              variant === 'link',
+          },
+          {
+            'h-10 px-4 py-2': size === 'default',
+            'h-9 rounded-md px-3': size === 'sm',
+            'h-11 rounded-md px-8': size === 'lg',
+            'h-10 w-10': size === 'icon',
+          },
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    );
+  }
+);
+Button.displayName = 'Button';
+
+
+
+----- FILE: hooks\useMultiStepForm.ts -----
+
+'use client';
+
+import { SchemaValidator } from '@/lib/schema-validator';
+import { FormData, FormSchema, UseMultiStepFormReturn } from '@/lib/types';
+import { useCallback, useMemo, useState } from 'react';
+
+/**
+ * Custom hook for managing multi-step form state and logic
+ *
+ * This hook provides a comprehensive solution for multi-step form management including:
+ * - Step navigation (next/previous)
+ * - Form data management with nested field support
+ * - Real-time validation using SchemaValidator
+ * - Error state management
+ * - Form submission handling
+ *
+ * The hook automatically handles field updates, validation, and step transitions
+ * while maintaining a clean API for form components.
+ *
+ * @param schema - The form schema defining steps, fields, and validation rules
+ * @returns Object containing form state and control functions
+ *
+ * @example
+ * ```typescript
+ * const {
+ *   currentStep,
+ *   formData,
+ *   errors,
+ *   nextStep,
+ *   prevStep,
+ *   updateField,
+ *   submitForm
+ * } = useMultiStepForm(formSchema);
+ *
+ * // Update a field
+ * updateField('firstName', 'John');
+ *
+ * // Navigate to next step
+ * const success = await nextStep();
+ * ```
+ */
+export const useMultiStepForm = (
+  schema: FormSchema
+): UseMultiStepFormReturn => {
+  /** Current step index (0-based) */
+  const [currentStep, setCurrentStep] = useState(0);
+
+  /** Form data object with nested field support */
+  const [formData, setFormData] = useState<FormData>({});
+
+  /** Validation errors mapped by field path */
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  /** Total number of steps in the form */
+  const totalSteps = schema.steps.length;
+
+  /**
+   * Updates a specific field in the form data
+   *
+   * Handles nested field updates for group fields using dot notation.
+   * Automatically clears any existing validation errors for the updated field.
+   *
+   * @param key - Field path (e.g., 'address.city' for nested fields)
+   * @param value - New value for the field
+   *
+   * @example
+   * ```typescript
+   * // Update a simple field
+   * updateField('firstName', 'John');
+   *
+   * // Update a nested field
+   * updateField('address.city', 'New York');
+   * ```
+   */
+  const updateField = useCallback((key: string, value: any) => {
+    setFormData(prev => {
+      const newData = { ...prev };
+      SchemaValidator.setNestedValue(newData, key, value);
+      return newData;
+    });
+
+    // Clear error for this field when user starts typing
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[key];
+      return newErrors;
+    });
+  }, []);
+
+  /**
+   * Validates the current step and moves to the next step if valid
+   *
+   * Performs comprehensive validation using SchemaValidator.validateStep()
+   * before allowing progression. If validation fails, errors are set and
+   * the function returns false. If validation passes, the step is incremented
+   * and errors are cleared.
+   *
+   * @returns Promise<boolean> - True if successfully moved to next step, false if validation failed
+   *
+   * @example
+   * ```typescript
+   * const success = await nextStep();
+   * if (success) {
+   *   console.log('Moved to next step');
+   * } else {
+   *   console.log('Validation failed, check errors');
+   * }
+   * ```
+   */
+  const nextStep = useCallback(async (): Promise<boolean> => {
+    if (currentStep >= totalSteps - 1) return false;
+
+    const currentStepFields = schema.steps[currentStep].fields;
+    const stepErrors = SchemaValidator.validateStep(
+      currentStepFields,
+      formData
+    );
+
+    if (Object.keys(stepErrors).length > 0) {
+      setErrors(stepErrors);
+      return false;
+    }
+
+    setErrors({});
+    setCurrentStep(prev => Math.min(prev + 1, totalSteps - 1));
+    return true;
+  }, [currentStep, totalSteps, schema.steps, formData]);
+
+  /**
+   * Moves to the previous step
+   *
+   * Decrements the current step index and clears any validation errors.
+   * Cannot go below step 0.
+   *
+   * @example
+   * ```typescript
+   * prevStep(); // Go back one step
+   * ```
+   */
+  const prevStep = useCallback(() => {
+    setCurrentStep(prev => Math.max(prev - 1, 0));
+    setErrors({});
+  }, []);
+
+  /**
+   * Jumps to a specific step by index
+   *
+   * Validates the target step index and clears errors when jumping.
+   * Useful for implementing step navigation or allowing users to jump
+   * to previously completed steps.
+   *
+   * @param stepIndex - Target step index (0-based)
+   *
+   * @example
+   * ```typescript
+   * goToStep(2); // Jump to step 3 (index 2)
+   * ```
+   */
+  const goToStep = useCallback(
+    (stepIndex: number) => {
+      if (stepIndex >= 0 && stepIndex < totalSteps) {
+        setCurrentStep(stepIndex);
+        setErrors({});
+      }
+    },
+    [totalSteps]
+  );
+
+  /**
+   * Resets the form to its initial state
+   *
+   * Clears all form data, errors, and returns to the first step.
+   * Useful for implementing a "Start Over" functionality.
+   *
+   * @example
+   * ```typescript
+   * resetForm(); // Reset everything and go to step 1
+   * ```
+   */
+  const resetForm = useCallback(() => {
+    setCurrentStep(0);
+    setFormData({});
+    setErrors({});
+  }, []);
+
+  /**
+   * Submits the final form data
+   *
+   * Validates the current step before submission. If validation passes,
+   * returns the complete form data. If validation fails, sets errors
+   * and returns null.
+   *
+   * @returns Promise<FormData | null> - Form data if valid, null if validation failed
+   *
+   * @example
+   * ```typescript
+   * const finalData = await submitForm();
+   * if (finalData) {
+   *   // Send data to server
+   *   await api.submitForm(finalData);
+   * }
+   * ```
+   */
+  // Replace the submitForm function in your useMultiStepForm hook with this:
+  const submitForm = useCallback(async (): Promise<FormData | null> => {
+    // Keeps your original validation logic
+    const currentStepFields = schema.steps[currentStep].fields;
+    const stepErrors = SchemaValidator.validateStep(
+      currentStepFields,
+      formData
+    );
+
+    if (Object.keys(stepErrors).length > 0) {
+      setErrors(stepErrors);
+      console.warn(
+        '❌ Form submission failed - Validation errors:',
+        stepErrors
+      );
+      alert('Please fix the validation errors before submitting.');
+      return null;
+    }
+
+    try {
+      // Show warning with form data in console
+      console.warn('⚠️ FORM SUBMISSION - Data being submitted:', formData);
+      alert(
+        '⚠️ Warning: Form data has been logged to console. Check browser dev tools.'
+      );
+
+      // Return the form data (as your hook expects)
+      return formData;
+    } catch (error) {
+      console.error('❌ Form submission error:', error);
+      alert('An error occurred while submitting the form. Please try again.');
+      return null;
+    }
+  }, [currentStep, schema.steps, formData]);
+
+  /**
+   * Computed property indicating if the current step is valid
+   *
+   * A step is considered valid if it has no validation errors.
+   * This is useful for enabling/disabling navigation buttons.
+   */
+  const isValid = useMemo(() => {
+    return Object.keys(errors).length === 0;
+  }, [errors]);
+
+  /**
+   * Computed property indicating if the user can proceed to the next step
+   *
+   * Can go next if:
+   * - Not on the last step
+   * - Current step has no validation errors
+   */
+  const canGoNext = useMemo(() => {
+    return currentStep < totalSteps - 1 && isValid;
+  }, [currentStep, totalSteps, isValid]);
+
+  /**
+   * Computed property indicating if the user can go to the previous step
+   *
+   * Can go previous if not on the first step.
+   */
+  const canGoPrev = useMemo(() => {
+    return currentStep > 0;
+  }, [currentStep]);
+
+  /**
+   * Computed property indicating if the user can submit the form
+   *
+   * Can submit if on the last step and the form is valid.
+   */
+  const canSubmit = useMemo(() => {
+    return currentStep === totalSteps - 1 && isValid;
+  }, [currentStep, totalSteps, isValid]);
+
+  return {
+    currentStep,
+    totalSteps,
+    formData,
+    errors,
+    isValid,
+    canGoNext,
+    canGoPrev,
+    canSubmit,
+    updateField,
+    nextStep,
+    prevStep,
+    goToStep,
+    resetForm,
+    submitForm,
+  };
+};
+
+
+
+----- FILE: jest.config.js -----
+
+const nextJest = require('next/jest');
+
+const createJestConfig = nextJest({
+  // Provide the path to your Next.js app to load next.config.js and .env files
+  dir: './',
+});
+
+// Add any custom config to be passed to Jest
+const customJestConfig = {
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testEnvironment: 'jsdom',
+  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
+  moduleNameMapping: {
+    '^@/(.*)$': '<rootDir>/$1',
+  },
+  collectCoverageFrom: [
+    'components/**/*.{ts,tsx}',
+    'hooks/**/*.{ts,tsx}',
+    'lib/**/*.{ts,tsx}',
+    '!**/*.d.ts',
+    '!**/node_modules/**',
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+  },
+};
+
+// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
+module.exports = createJestConfig(customJestConfig);
+
+
+
+----- FILE: jest.setup.js -----
+
+import '@testing-library/jest-dom';
+
+// Mock Next.js router
+jest.mock('next/navigation', () => ({
+  useRouter() {
+    return {
+      push: jest.fn(),
+      replace: jest.fn(),
+      prefetch: jest.fn(),
+      back: jest.fn(),
+      forward: jest.fn(),
+      refresh: jest.fn(),
+    };
+  },
+  useSearchParams() {
+    return new URLSearchParams();
+  },
+  usePathname() {
+    return '/';
+  },
+}));
+
+// Mock console methods in tests to reduce noise
+global.console = {
+  ...console,
+  // Uncomment to ignore a specific log level
+  // log: jest.fn(),
+  // debug: jest.fn(),
+  // info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+};
+
+// Global test timeout
+jest.setTimeout(10000);
+
+
+
+----- FILE: lib\form-schema.json -----
+
+{
+  "steps": [
+    {
+      "title": "User Details",
+      "fields": [
+        {
+          "key": "fullName",
+          "label": "Full Name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "email",
+          "label": "Email",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "phone",
+          "label": "Phone Number",
+          "type": "group",
+          "fields": [
+            {
+              "key": "countryCode",
+              "label": "Country Code",
+              "type": "select",
+              "options": ["+971", "+966", "+1", "+44"],
+              "required": true
+            },
+            {
+              "key": "number",
+              "label": "Phone Number",
+              "type": "text",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Property Info",
+      "fields": [
+        {
+          "key": "propertyType",
+          "label": "Property Type",
+          "type": "select",
+          "options": ["Residential", "Commercial"],
+          "required": true
+        },
+        {
+          "key": "category",
+          "label": "Category",
+          "type": "select",
+          "required": true,
+          "optionSource": {
+            "key": "propertyType",
+            "map": {
+              "Residential": ["Apartment", "Villa"],
+              "Commercial": ["Office", "Retail", "Warehouse"]
+            }
+          },
+          "dependencies": [
+            {
+              "key": "propertyType",
+              "notEmpty": true
+            }
+          ]
+        },
+        {
+          "key": "subCategory",
+          "label": "Subcategory",
+          "type": "select",
+          "required": true,
+          "optionSource": {
+            "key": "category",
+            "map": {
+              "Apartment": ["Studio", "1BR", "2BR", "Penthouse"],
+              "Villa": ["3BR", "4BR", "5BR+"],
+              "Office": ["Shell & Core", "Fitted", "Partitioned"],
+              "Retail": ["Street-Facing", "Mall-Unit"],
+              "Warehouse": ["Cold Storage", "Dry Storage"]
+            }
+          },
+          "dependencies": [
+            {
+              "key": "category",
+              "notEmpty": true
+            }
+          ]
+        },
+        {
+          "key": "size",
+          "label": "Size (sqm)",
+          "type": "number",
+          "required": true
+        }
+      ]
+    },
+    {
+      "title": "Location & Amenities",
+      "fields": [
+        {
+          "key": "location",
+          "label": "Location",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "hasParking",
+          "label": "Parking Available?",
+          "type": "checkbox"
+        },
+        {
+          "key": "parkingSpots",
+          "label": "Number of Parking Spots",
+          "type": "number",
+          "dependencies": [
+            {
+              "key": "hasParking",
+              "equals": true
+            }
+          ]
+        },
+        {
+          "key": "amenities",
+          "label": "Amenities",
+          "type": "group",
+          "fields": [
+            {
+              "key": "hasPool",
+              "label": "Pool",
+              "type": "checkbox"
+            },
+            {
+              "key": "hasGym",
+              "label": "Gym",
+              "type": "checkbox"
+            },
+            {
+              "key": "hasBalcony",
+              "label": "Balcony",
+              "type": "checkbox"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Review & Submit",
+      "fields": []
+    }
+  ]
+}
+
+
+
+----- FILE: lib\schema-validator.ts -----
+
+
+
+
+----- FILE: lib\types.ts -----
+
+/**
+ * Core type definitions for the multi-step form system
+ */
+
+export type FieldType =
+  | 'text'
+  | 'number'
+  | 'select'
+  | 'checkbox'
+  | 'radio'
+  | 'date'
+  | 'group';
+
+export interface FormDependency {
+  key: string;
+  equals?: any;
+  notEmpty?: boolean;
+}
+
+export interface OptionSource {
+  key: string;
+  map: Record<string, string[]>;
+}
+
+export interface FormField {
+  key: string;
+  label: string;
+  type: FieldType;
+  required?: boolean;
+  options?: string[];
+  optionSource?: OptionSource;
+  dependencies?: FormDependency[];
+  fields?: FormField[]; // For group type
+}
+
+export interface FormStep {
+  title: string;
+  fields: FormField[];
+}
+
+export interface FormSchema {
+  steps: FormStep[];
+}
+
+/**
+ * Form data type - dynamically generated based on schema
+ */
+export type FormData = Record<string, any>;
+
+/**
+ * Form state management types
+ */
+export interface FormState {
+  currentStep: number;
+  data: FormData;
+  errors: Record<string, string>;
+  isValid: boolean;
+}
+
+/**
+ * Hook return type for form management
+ *
+ * Provides comprehensive form state and control functions for multi-step forms
+ */
+export interface UseMultiStepFormReturn {
+  /** Current step index (0-based) */
+  currentStep: number;
+  /** Total number of steps in the form */
+  totalSteps: number;
+  /** Form data object with nested field support */
+  formData: FormData;
+  /** Validation errors mapped by field path */
+  errors: Record<string, string>;
+  /** Whether the current step has no validation errors */
+  isValid: boolean;
+  /** Whether the user can proceed to the next step */
+  canGoNext: boolean;
+  /** Whether the user can go to the previous step */
+  canGoPrev: boolean;
+  /** Whether the user can submit the form */
+  canSubmit: boolean;
+  /** Function to update a specific field value */
+  updateField: (key: string, value: any) => void;
+  /** Function to validate and move to next step */
+  nextStep: () => Promise<boolean>;
+  /** Function to move to previous step */
+  prevStep: () => void;
+  /** Function to jump to a specific step */
+  goToStep: (stepIndex: number) => void;
+  /** Function to reset form to initial state */
+  resetForm: () => void;
+  /** Function to submit the final form data - FIXED: Returns FormData | null */
+  submitForm: () => Promise<FormData | null>;
+}
+
+/**
+ * Form Navigation component props
+ */
+export interface FormNavigationProps {
+  currentStep: number;
+  totalSteps: number;
+  canGoPrev: boolean;
+  canGoNext: boolean;
+  /** Function to go to previous step */
+  onPrev: () => void;
+  /** Function to go to next step - returns success boolean */
+  onNext: () => Promise<boolean>;
+  /** Function to submit form - FIXED: Returns FormData | null to match hook */
+  onSubmit: () => Promise<FormData | null>;
+  isLoading?: boolean;
+}
+
+/**
+ * Form Field component props
+ */
+export interface FormFieldProps {
+  field: FormField;
+  formData: FormData;
+  onUpdate: (key: string, value: any) => void;
+  errors: Record<string, string>;
+  parentPath?: string;
+}
+
+
+
+----- FILE: lib\utils.ts -----
+
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+/**
+ * Utility function to merge Tailwind CSS classes
+ * Combines clsx and tailwind-merge for optimal class handling
+ */
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+/**
+ * Debounce utility for performance optimization
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+
+
+----- FILE: lib\validation.ts -----
+
+/**
+ * Validation utilities using Zod for form validation
+ * Provides robust validation for common field types with detailed error messages
+ */
+
+import { z } from 'zod';
+
+/**
+ * Validation result interface containing validation status and error messages
+ */
+export interface ValidationResult {
+  /** Whether the field value is valid */
+  isValid: boolean;
+  /** Array of error messages for the field */
+  errors: string[];
+  /** The normalized/cleaned value if applicable */
+  normalizedValue?: any;
+}
+
+/**
+ * Field validation options for different validation rules
+ */
+export interface ValidationOptions {
+  /** Whether the field is required */
+  required?: boolean;
+  /** Minimum length for string fields */
+  minLength?: number;
+  /** Maximum length for string fields */
+  maxLength?: number;
+  /** Minimum value for numeric fields */
+  minValue?: number;
+  /** Maximum value for numeric fields */
+  maxValue?: number;
+  /** Custom validation function */
+  customValidator?: (value: any) => ValidationResult;
+  /** Whether to trim whitespace from string values */
+  trim?: boolean;
+  /** Whether to allow empty strings (different from required) */
+  allowEmpty?: boolean;
+}
+
+/**
+ * Validates a text field with comprehensive checks using Zod
+ */
+export function validateText(
+  value: any,
+  fieldName: string,
+  options: ValidationOptions = {}
+): ValidationResult {
+  try {
+    const schema = z.string();
+    const result = schema.safeParse(value);
+
+    if (!result.success) {
+      return {
+        isValid: false,
+        errors: result.error.issues.map(issue => issue.message),
+        normalizedValue: value,
+      };
+    }
+
+    let textValue = result.data;
+    const errors: string[] = [];
+
+    // Apply validation rules
+    if (options.required && (!textValue || textValue.trim() === '')) {
+      errors.push(`${fieldName} is required`);
+    }
+
+    if (
+      textValue &&
+      options.minLength &&
+      textValue.length < options.minLength
+    ) {
+      errors.push(
+        `${fieldName} must be at least ${options.minLength} characters`
+      );
+    }
+
+    if (
+      textValue &&
+      options.maxLength &&
+      textValue.length > options.maxLength
+    ) {
+      errors.push(
+        `${fieldName} must be no more than ${options.maxLength} characters`
+      );
+    }
+
+    if (options.trim && textValue) {
+      textValue = textValue.trim();
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      normalizedValue: textValue,
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      errors: [`${fieldName} validation failed`],
+      normalizedValue: value,
+    };
+  }
+}
+
+/**
+ * Validates an email address using Zod
+ */
+export function validateEmail(
+  value: any,
+  fieldName: string = 'Email',
+  options: ValidationOptions = {}
+): ValidationResult {
+  try {
+    const schema = z
+      .string()
+      .email(`${fieldName} must be a valid email address`);
+    const result = schema.safeParse(value);
+
+    if (!result.success) {
+      return {
+        isValid: false,
+        errors: result.error.issues.map(issue => issue.message),
+        normalizedValue: value,
+      };
+    }
+
+    const errors: string[] = [];
+
+    if (options.required && (!result.data || result.data.trim() === '')) {
+      errors.push(`${fieldName} is required`);
+    }
+
+    if (result.data && result.data.length > 254) {
+      errors.push(`${fieldName} is too long (maximum 254 characters)`);
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      normalizedValue: result.data,
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      errors: [`${fieldName} validation failed`],
+      normalizedValue: value,
+    };
+  }
+}
+
+/**
+ * Validates a phone number using Zod
+ */
+export function validatePhoneNumber(
+  value: any,
+  fieldName: string = 'Phone Number',
+  options: ValidationOptions = {}
+): ValidationResult {
+  try {
+    const schema = z
+      .string()
+      .regex(/^\d{7,15}$/, `${fieldName} must be 7-15 digits only`);
+    const result = schema.safeParse(value);
+
+    if (!result.success) {
+      return {
+        isValid: false,
+        errors: result.error.issues.map(issue => issue.message),
+        normalizedValue: value,
+      };
+    }
+
+    const errors: string[] = [];
+
+    if (options.required && (!result.data || result.data.trim() === '')) {
+      errors.push(`${fieldName} is required`);
+    }
+
+    if (result.data && result.data.length < 7) {
+      errors.push(`${fieldName} must be at least 7 digits`);
+    }
+
+    if (result.data && result.data.length > 15) {
+      errors.push(`${fieldName} is too long (maximum 15 digits)`);
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      normalizedValue: result.data,
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      errors: [`${fieldName} validation failed`],
+      normalizedValue: value,
+    };
+  }
+}
+
+/**
+ * Validates a name field using Zod
+ */
+export function validateName(
+  value: any,
+  fieldName: string = 'Name',
+  options: ValidationOptions = {}
+): ValidationResult {
+  try {
+    const schema = z.string();
+    const result = schema.safeParse(value);
+
+    if (!result.success) {
+      return {
+        isValid: false,
+        errors: result.error.issues.map(issue => issue.message),
+        normalizedValue: value,
+      };
+    }
+
+    let nameValue = result.data;
+    const errors: string[] = [];
+
+    if (options.required && (!nameValue || nameValue.trim() === '')) {
+      errors.push(`${fieldName} is required`);
+    }
+
+    if (nameValue) {
+      if (nameValue.length < 2) {
+        errors.push(`${fieldName} must be at least 2 characters`);
+      }
+
+      if (nameValue.length > 100) {
+        errors.push(`${fieldName} is too long (maximum 100 characters)`);
+      }
+
+      if (!/^[a-zA-ZÀ-ÿ\s\-'\.]+$/.test(nameValue)) {
+        errors.push(`${fieldName} contains invalid characters`);
+      }
+
+      if (/\s{2,}/.test(nameValue)) {
+        errors.push(`${fieldName} cannot contain consecutive spaces`);
+      }
+
+      if (nameValue !== nameValue.trim()) {
+        errors.push(`${fieldName} cannot start or end with spaces`);
+      }
+
+      if (options.trim) {
+        nameValue = nameValue.trim();
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      normalizedValue: nameValue,
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      errors: [`${fieldName} validation failed`],
+      normalizedValue: value,
+    };
+  }
+}
+
+/**
+ * Validates a numeric field using Zod
+ */
+export function validateNumber(
+  value: any,
+  fieldName: string = 'Number',
+  options: ValidationOptions & {
+    /** Whether to allow decimal numbers */
+    allowDecimals?: boolean;
+    /** Whether to allow negative numbers */
+    allowNegative?: boolean;
+    /** Number of decimal places allowed */
+    decimalPlaces?: number;
+  } = {}
+): ValidationResult {
+  try {
+    const schema = z.coerce.number({
+      errorMap: () => ({ message: `${fieldName} must be a valid number` }),
+    });
+    const result = schema.safeParse(value);
+
+    if (!result.success) {
+      return {
+        isValid: false,
+        errors: result.error.issues.map(issue => issue.message),
+        normalizedValue: value,
+      };
+    }
+
+    const numValue = result.data;
+    const errors: string[] = [];
+
+    if (options.required && (numValue === undefined || numValue === null)) {
+      errors.push(`${fieldName} is required`);
+    }
+
+    if (!options.allowNegative && numValue < 0) {
+      errors.push(`${fieldName} cannot be negative`);
+    }
+
+    if (options.minValue !== undefined && numValue < options.minValue) {
+      errors.push(`${fieldName} must be at least ${options.minValue}`);
+    }
+
+    if (options.maxValue !== undefined && numValue > options.maxValue) {
+      errors.push(`${fieldName} must be no more than ${options.maxValue}`);
+    }
+
+    if (!options.allowDecimals && !Number.isInteger(numValue)) {
+      errors.push(`${fieldName} must be a whole number`);
+    }
+
+    if (options.decimalPlaces !== undefined) {
+      const decimalStr = numValue.toString().split('.')[1];
+      if (decimalStr && decimalStr.length > options.decimalPlaces) {
+        errors.push(
+          `${fieldName} cannot have more than ${options.decimalPlaces} decimal places`
+        );
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      normalizedValue: numValue,
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      errors: [`${fieldName} validation failed`],
+      normalizedValue: value,
+    };
+  }
+}
+
+/**
+ * Validates a date field using Zod
+ */
+export function validateDate(
+  value: any,
+  fieldName: string = 'Date',
+  options: ValidationOptions & {
+    /** Minimum allowed date */
+    minDate?: Date;
+    /** Maximum allowed date */
+    maxDate?: Date;
+    /** Whether to allow future dates */
+    allowFuture?: boolean;
+    /** Whether to allow past dates */
+    allowPast?: boolean;
+  } = {}
+): ValidationResult {
+  try {
+    let dateValue: Date;
+
+    // Convert to Date object
+    if (value instanceof Date) {
+      dateValue = value;
+    } else if (typeof value === 'number') {
+      dateValue = new Date(value);
+    } else if (typeof value === 'string') {
+      dateValue = new Date(value);
+    } else {
+      return {
+        isValid: false,
+        errors: [`${fieldName} must be a valid date`],
+        normalizedValue: value,
+      };
+    }
+
+    const errors: string[] = [];
+
+    // Check if date is valid
+    if (isNaN(dateValue.getTime())) {
+      errors.push(`${fieldName} must be a valid date`);
+      return {
+        isValid: false,
+        errors,
+        normalizedValue: value,
+      };
+    }
+
+    if (options.required && !dateValue) {
+      errors.push(`${fieldName} is required`);
+    }
+
+    if (!options.allowFuture && dateValue > new Date()) {
+      errors.push(`${fieldName} cannot be in the future`);
+    }
+
+    if (!options.allowPast && dateValue < new Date()) {
+      errors.push(`${fieldName} cannot be in the past`);
+    }
+
+    if (options.minDate && dateValue < options.minDate) {
+      errors.push(
+        `${fieldName} cannot be earlier than ${options.minDate.toLocaleDateString()}`
+      );
+    }
+
+    if (options.maxDate && dateValue > options.maxDate) {
+      errors.push(
+        `${fieldName} cannot be later than ${options.maxDate.toLocaleDateString()}`
+      );
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      normalizedValue: dateValue,
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      errors: [`${fieldName} validation failed`],
+      normalizedValue: value,
+    };
+  }
+}
+
+/**
+ * Validates a required field with custom validation logic
+ */
+export function validateRequired(
+  value: any,
+  fieldName: string,
+  validator?: (value: any) => ValidationResult
+): ValidationResult {
+  const errors: string[] = [];
+
+  // Check if required field is present
+  if (value === undefined || value === null || value === '') {
+    errors.push(`${fieldName} is required`);
+    return { isValid: false, errors };
+  }
+
+  // Apply custom validation if provided
+  if (validator) {
+    const customResult = validator(value);
+    if (!customResult.isValid) {
+      errors.push(...customResult.errors);
+    }
+  }
+
+  return { isValid: errors.length === 0, errors, normalizedValue: value };
+}
+
+/**
+ * Validates multiple fields and returns combined results
+ */
+export function combineValidations(
+  validations: ValidationResult[]
+): ValidationResult {
+  const allErrors: string[] = [];
+  const allNormalizedValues: Record<string, any> = {};
+
+  validations.forEach((validation, index) => {
+    if (!validation.isValid) {
+      allErrors.push(...validation.errors);
+    }
+    if (validation.normalizedValue !== undefined) {
+      allNormalizedValues[`field_${index}`] = validation.normalizedValue;
+    }
+  });
+
+  return {
+    isValid: allErrors.length === 0,
+    errors: allErrors,
+    normalizedValue: allNormalizedValues,
+  };
+}
+
+/**
+ * Validates a name field specifically for forms using Zod
+ */
+export function validateNameField(
+  value: any,
+  fieldName: string = 'Name',
+  options: ValidationOptions = {}
+): ValidationResult {
+  try {
+    // Reject numbers and other non-string types
+    if (typeof value === 'number') {
+      return {
+        isValid: false,
+        errors: [`${fieldName} must be text, not a number`],
+        normalizedValue: value,
+      };
+    }
+
+    if (typeof value !== 'string') {
+      return {
+        isValid: false,
+        errors: [`${fieldName} must be text`],
+        normalizedValue: value,
+      };
+    }
+
+    const schema = z.string();
+    const result = schema.safeParse(value);
+
+    if (!result.success) {
+      return {
+        isValid: false,
+        errors: result.error.issues.map(issue => issue.message),
+        normalizedValue: value,
+      };
+    }
+
+    let nameValue = result.data;
+    const errors: string[] = [];
+
+    if (options.required && (!nameValue || nameValue.trim() === '')) {
+      errors.push(`${fieldName} is required`);
+    }
+
+    if (nameValue) {
+      if (nameValue.length < 2) {
+        errors.push(`${fieldName} must be at least 2 characters`);
+      }
+
+      if (nameValue.length > 100) {
+        errors.push(`${fieldName} is too long (maximum 100 characters)`);
+      }
+
+      if (!/^[a-zA-ZÀ-ÿ\s\-'\.]+$/.test(nameValue)) {
+        errors.push(
+          `${fieldName} can only contain letters, spaces, hyphens, apostrophes, and periods`
+        );
+      }
+
+      if (/\s{2,}/.test(nameValue)) {
+        errors.push(`${fieldName} cannot contain consecutive spaces`);
+      }
+
+      if (nameValue !== nameValue.trim()) {
+        errors.push(`${fieldName} cannot start or end with spaces`);
+      }
+
+      if (options.trim) {
+        nameValue = nameValue.trim();
+      }
+
+      if (options.minLength && nameValue.length < options.minLength) {
+        errors.push(
+          `${fieldName} must be at least ${options.minLength} characters`
+        );
+      }
+
+      if (options.maxLength && nameValue.length > options.maxLength) {
+        errors.push(
+          `${fieldName} must be no more than ${options.maxLength} characters`
+        );
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      normalizedValue: nameValue,
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      errors: [`${fieldName} validation failed`],
+      normalizedValue: value,
+    };
+  }
+}
+
+
+
+----- FILE: next.config.ts -----
+
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  reactStrictMode: false,
+  experimental: {},
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
+};
+
+export default nextConfig;
+
+
+
+----- FILE: scripts\generateContent.js -----
+
+const fs = require('fs');
+const path = require('path');
+
+// Allowed file extensions for code/content files only
+const allowedExtensions = new Set([
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.json',
+  '.css',
+  '.mjs',
+  '.cjs',
+  '.md',
+  '.html',
+  '.d.ts',
+  '.json',
+  '.mjs',
+  '.cjs',
+  '.mjs',
+  '.mjs',
+  '.mjs',
+]);
+
+// Ignore these folders completely
+const ignoreFolders = new Set(['node_modules', '.next', 'public', '.git']);
+
+// Ignore these files explicitly (non-code files in root)
+const ignoreFiles = new Set([
+  'package-lock.json',
+  'package.json',
+  'README.md',
+  'tailwind.config.js',
+  'postcss.config.mjs',
+  'eslint.config.mjs',
+  'next-env.d.ts',
+  'tsconfig.json',
+  'tsconfig.scripts.json',
+  'structureGeneration.ts',
+]);
+
+function gatherFiles(dir, baseDir = dir) {
+  if (ignoreFolders.has(path.basename(dir))) return [];
+
+  let files = [];
+  const entries = fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter(entry => !ignoreFiles.has(entry.name));
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      files = files.concat(gatherFiles(fullPath, baseDir));
+    } else if (entry.isFile()) {
+      // Check extension + also exclude root-level ignored files
+      if (allowedExtensions.has(path.extname(entry.name))) {
+        files.push(fullPath);
+      }
+    }
+  }
+  return files;
+}
+
+const rootDir = process.cwd();
+const outputFile = path.join(rootDir, 'project-content.txt');
+
+const files = gatherFiles(rootDir);
+
+const writeStream = fs.createWriteStream(outputFile, { encoding: 'utf-8' });
+
+for (const filePath of files) {
+  const relPath = path.relative(rootDir, filePath);
+  const content = fs.readFileSync(filePath, 'utf-8');
+
+  writeStream.write(`----- FILE: ${relPath} -----\n\n`);
+  writeStream.write(content);
+  writeStream.write(`\n\n\n`);
+}
+
+writeStream.end(() => {
+  console.log(`✅ All code file contents written to ${outputFile}`);
+});
+
+
+
+----- FILE: scripts\generateStructure.js -----
+
+const fs = require('fs');
+const path = require('path');
+
+const ignoreFolders = new Set(['node_modules', '.git', '.next']);
+const ignoreFiles = new Set(['.gitignore']);
+
+function generateTree(dir, prefix = '') {
+  if (ignoreFolders.has(path.basename(dir))) return '';
+
+  const entries = fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter(entry => !ignoreFiles.has(entry.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  let tree = '';
+  entries.forEach((entry, index) => {
+    const isLast = index === entries.length - 1;
+    const pointer = isLast ? '└── ' : '├── ';
+    tree += `${prefix}${pointer}${entry.name}\n`;
+
+    if (entry.isDirectory()) {
+      const newPrefix = prefix + (isLast ? '    ' : '│   ');
+      tree += generateTree(path.join(dir, entry.name), newPrefix);
+    }
+  });
+
+  return tree;
+}
+
+const rootDir = process.cwd();
+const outputFile = path.join(rootDir, 'project-structure.txt');
+
+const treeStr = generateTree(rootDir);
+fs.writeFileSync(outputFile, treeStr);
+
+console.log(`✅ Project structure saved to ${outputFile}`);
+
+
+
+----- FILE: validations\form-schemas.ts -----
+
+import { z } from 'zod';
+
+/**
+ * Dynamic schema generator based on form configuration
+ * Creates Zod schemas for validation at runtime
+ */
+
+export const createFieldSchema = (field: any): z.ZodTypeAny => {
+  let schema: z.ZodTypeAny;
+
+  switch (field.type) {
+    case 'text':
+      schema = z.string();
+      if (field.key === 'email') {
+        schema = (schema as z.ZodString).email(
+          'Please enter a valid email address'
+        );
+      } else if (field.key === 'fullName') {
+        schema = (schema as z.ZodString).min(1, ${field.label} is required);
+      } else if (field.key === 'phone') {
+        schema = (schema as z.ZodString).min(
+          10,
+          'Phone number must be at least 10 digits'
+        );
+      }
+      break;
+    case 'number':
+      schema = z.coerce.number().min(0, 'Must be a positive number');
+      break;
+    case 'select':
+      if (field.options) {
+        schema = z.enum(field.options as [string, ...string[]]);
+      } else {
+        schema = z.string();
+      }
+      break;
+    case 'checkbox':
+      schema = z.boolean().default(false);
+      break;
+    case 'radio':
+      if (field.options) {
+        schema = z.enum(field.options as [string, ...string[]]);
+      } else {
+        schema = z.string();
+      }
+      break;
+    case 'date':
+      schema = z.string().refine(date => !isNaN(Date.parse(date)), {
+        message: 'Please enter a valid date',
+      });
+      break;
+    case 'group':
+      const groupSchema: Record<string, z.ZodTypeAny> = {};
+      if (field.fields) {
+        field.fields.forEach((subField: any) => {
+          groupSchema[subField.key] = createFieldSchema(subField);
+          if (subField.required) {
+            // Apply required validation based on field type
+            if (
+              subField.type === 'text' ||
+              subField.type === 'select' ||
+              subField.type === 'radio'
+            ) {
+              groupSchema[subField.key] = (
+                groupSchema[subField.key] as z.ZodString
+              ).min(1, ${subField.label} is required);
+            } else if (subField.type === 'number') {
+              // Number fields are already validated by coerce.number().min(0)
+              // Additional required validation not needed
+            }
+          }
+        });
+      }
+      schema = z.object(groupSchema);
+      break;
+    default:
+      schema = z.string();
+  }
+
+  if (field.required && field.type !== 'checkbox' && field.type !== 'group') {
+    schema = (schema as z.ZodString).min(1, ${field.label} is required);
+  }
+
+  return schema;
+};
+
+/**
+ * Creates a complete schema for all form steps
+ */
+export const createFormSchema = (steps: any[]) => {
+  const schemaObject: Record<string, z.ZodTypeAny> = {};
+
+  steps.forEach(step => {
+    step.fields.forEach((field: any) => {
+      schemaObject[field.key] = createFieldSchema(field);
+    });
+  });
+
+  return z.object(schemaObject);
+};
+
+/**
+ * Base validation schemas for common field types
+ */
+export const baseSchemas = {
+  email: z.string().email('Please enter a valid email address'),
+  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
+  required: z.string().min(1, 'This field is required'),
+  number: z.coerce.number().min(0, 'Must be a positive number'),
+  boolean: z.boolean().default(false),
+};
+
+
+
+----- FILE: __tests__\lib\validation.test.ts -----
+
+import {
+  combineValidations,
+  validateDate,
+  validateEmail,
+  validateName,
+  validateNameField,
+  validateNumber,
+  validatePhoneNumber,
+  validateRequired,
+  validateText,
+  ValidationResult,
+} from '@/lib/validation';
+
+describe('Validation Utilities', () => {
+  describe('validateText', () => {
+    it('should validate required text fields', () => {
+      const result = validateText('', 'Test Field', { required: true });
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Test Field is required');
+    });
+
+    it('should validate minimum length', () => {
+      const result = validateText('ab', 'Test Field', { minLength: 3 });
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Test Field must be at least 3 characters'
+      );
+    });
+
+    it('should validate maximum length', () => {
+      const result = validateText('abcdef', 'Test Field', { maxLength: 5 });
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Test Field must be no more than 5 characters'
+      );
+    });
+
+    it('should trim whitespace when trim option is true', () => {
+      const result = validateText('  test  ', 'Test Field', { trim: true });
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedValue).toBe('test');
+    });
+
+    it('should allow empty strings when not required and allowEmpty is true', () => {
+      const result = validateText('', 'Test Field', { allowEmpty: true });
+      expect(result.isValid).toBe(true);
+    });
+
+    it('should validate valid text input', () => {
+      const result = validateText('valid text', 'Test Field');
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+  });
+
+  describe('validateEmail', () => {
+    it('should validate valid email addresses', () => {
+      const validEmails = [
+        'test@example.com',
+        'user.name@domain.co.uk',
+        'user+tag@example.org',
+        '123@example.com',
+      ];
+
+      validEmails.forEach(email => {
+        const result = validateEmail(email, 'Email');
+        expect(result.isValid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+    });
+
+    it('should validate email length limits', () => {
+      const longEmail = 'a'.repeat(65) + '@' + 'b'.repeat(190) + '.com';
+      const result = validateEmail(longEmail, 'Email');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Email local part is too long (maximum 64 characters)'
+      );
+    });
+
+    it('should handle required validation', () => {
+      const result = validateEmail('', 'Email', { required: true });
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Email is required');
+    });
+  });
+
+  describe('validatePhoneNumber', () => {
+    it('should validate valid phone number formats', () => {
+      const validPhones = [
+        '+1-555-123-4567',
+        '(555) 123-4567',
+        '555-123-4567',
+        '5551234567',
+        '+44 20 7946 0958',
+      ];
+
+      validPhones.forEach(phone => {
+        const result = validatePhoneNumber(phone, 'Phone Number');
+        expect(result.isValid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+    });
+
+    it('should reject invalid phone numbers', () => {
+      const invalidPhones = [
+        '123',
+        'abcdefghij',
+        '555-123',
+        '+1-555-123-456789012345',
+      ];
+
+      invalidPhones.forEach(phone => {
+        const result = validatePhoneNumber(phone, 'Phone Number');
+        expect(result.isValid).toBe(false);
+      });
+    });
+
+    it('should validate minimum digit count', () => {
+      const result = validatePhoneNumber('123', 'Phone Number');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Phone Number must be at least 7 digits');
+    });
+
+    it('should validate maximum digit count', () => {
+      const result = validatePhoneNumber('1234567890123456789', 'Phone Number');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Phone Number is too long (maximum 15 digits)'
+      );
+    });
+  });
+
+  describe('validateName', () => {
+    it('should validate valid names', () => {
+      const validNames = [
+        'John Doe',
+        'Mary Jane',
+        'José García',
+        'Jean-Pierre',
+        "O'Connor",
+      ];
+
+      validNames.forEach(name => {
+        const result = validateName(name, 'Full Name');
+        expect(result.isValid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+    });
+
+    it('should reject names with invalid characters', () => {
+      const invalidNames = [
+        'John123',
+        'Mary@Jane',
+        'José#García',
+        'Jean-Pierre!',
+      ];
+
+      invalidNames.forEach(name => {
+        const result = validateName(name, 'Full Name');
+        expect(result.isValid).toBe(false);
+      });
+    });
+
+    it('should reject names with consecutive spaces', () => {
+      const result = validateName('John  Doe', 'Full Name');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Full Name cannot contain consecutive spaces'
+      );
+    });
+
+    it('should reject names that are too short', () => {
+      const result = validateName('A', 'Full Name');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Full Name must be at least 2 characters'
+      );
+    });
+
+    it('should allow special characters when specified', () => {
+      const result = validateName('José García', 'Full Name', {
+        allowSpecialChars: true,
+      });
+      expect(result.isValid).toBe(true);
+    });
+  });
+
+  describe('validateNumber', () => {
+    it('should reject invalid numbers', () => {
+      const invalidNumbers = ['abc', '12a34', NaN];
+
+      invalidNumbers.forEach(num => {
+        const result = validateNumber(num, 'Number');
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('Number must be a valid number');
+      });
+    });
+
+    it('should validate range constraints', () => {
+      const result = validateNumber(25, 'Age', { minValue: 0, maxValue: 120 });
+      expect(result.isValid).toBe(true);
+
+      const tooLow = validateNumber(-5, 'Age', { minValue: 0 });
+      expect(tooLow.isValid).toBe(false);
+      expect(tooLow.errors).toContain('Age must be at least 0');
+
+      const tooHigh = validateNumber(150, 'Age', { maxValue: 120 });
+      expect(tooHigh.isValid).toBe(false);
+      expect(tooHigh.errors).toContain('Age must be no more than 120');
+    });
+
+    it('should validate decimal places', () => {
+      const result = validateNumber(3.14159, 'Pi', { decimalPlaces: 2 });
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Pi cannot have more than 2 decimal places'
+      );
+    });
+
+    it('should reject negative numbers when not allowed', () => {
+      const result = validateNumber(-5, 'Count', { allowNegative: false });
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Count cannot be negative');
+    });
+  });
+
+  describe('validateDate', () => {
+    it('should reject invalid dates', () => {
+      const invalidDates = ['invalid-date', '2023-13-45', 'not-a-date'];
+
+      invalidDates.forEach(date => {
+        const result = validateDate(date, 'Date');
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('Date must be a valid date');
+      });
+    });
+
+    it('should validate future/past date restrictions', () => {
+      const futureDate = new Date();
+      futureDate.setFullYear(futureDate.getFullYear() + 1);
+
+      const result = validateDate(futureDate, 'Date', { allowFuture: false });
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Date cannot be in the future');
+    });
+  });
+
+  describe('validateRequired', () => {
+    it('should validate required fields', () => {
+      const result = validateRequired('', 'Required Field');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Required Field is required');
+    });
+
+    it('should pass validation for non-empty values', () => {
+      const result = validateRequired('valid value', 'Required Field');
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should apply custom validation', () => {
+      const customValidator = (value: any): ValidationResult => {
+        if (value.length < 5) {
+          return { isValid: false, errors: ['Value too short'] };
+        }
+        return { isValid: true, errors: [] };
+      };
+
+      const result = validateRequired('abc', 'Field', customValidator);
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Value too short');
+    });
+  });
+
+  describe('combineValidations', () => {
+    it('should combine multiple validation results', () => {
+      const validations = [
+        { isValid: true, errors: [] },
+        { isValid: false, errors: ['Error 1'] },
+        { isValid: false, errors: ['Error 2'] },
+      ];
+
+      const result = combineValidations(validations);
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Error 1');
+      expect(result.errors).toContain('Error 2');
+    });
+
+    it('should return valid when all validations pass', () => {
+      const validations = [
+        { isValid: true, errors: [] },
+        { isValid: true, errors: [] },
+      ];
+
+      const result = combineValidations(validations);
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should collect normalized values', () => {
+      const validations = [
+        { isValid: true, errors: [], normalizedValue: 'value1' },
+        { isValid: true, errors: [], normalizedValue: 'value2' },
+      ];
+
+      const result = combineValidations(validations);
+      expect(result.normalizedValue).toEqual({
+        field_0: 'value1',
+        field_1: 'value2',
+      });
+    });
+  });
+
+  describe('validateNameField', () => {
+    it('should validate valid name strings', () => {
+      const validNames = [
+        'John Doe',
+        'Mary Jane',
+        'José García',
+        'Jean-Pierre',
+        "O'Connor",
+        'Dr. Smith',
+      ];
+
+      validNames.forEach(name => {
+        const result = validateNameField(name, 'Full Name');
+        expect(result.isValid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+    });
+
+    it('should reject numbers for name fields', () => {
+      const invalidNumbers = [123, 456, 0, -1, 3.14];
+
+      invalidNumbers.forEach(num => {
+        const result = validateNameField(num, 'Full Name');
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain('Full Name must be text, not a number');
+      });
+    });
+
+    it('should reject names with invalid characters', () => {
+      const invalidNames = [
+        'John123',
+        'Mary@Jane',
+        'José#García',
+        'Jean-Pierre!',
+        'Name$',
+      ];
+
+      invalidNames.forEach(name => {
+        const result = validateNameField(name, 'Full Name');
+        expect(result.isValid).toBe(false);
+        expect(result.errors).toContain(
+          'Full Name can only contain letters, spaces, hyphens, apostrophes, and periods'
+        );
+      });
+    });
+
+    it('should reject names with consecutive spaces', () => {
+      const result = validateNameField('John  Doe', 'Full Name');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Full Name cannot contain consecutive spaces'
+      );
+    });
+
+    it('should reject names that are too short', () => {
+      const result = validateNameField('A', 'Full Name');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Full Name must be at least 2 characters'
+      );
+    });
+
+    it('should reject names that are too long', () => {
+      const longName = 'A'.repeat(101);
+      const result = validateNameField(longName, 'Full Name');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        'Full Name is too long (maximum 100 characters)'
+      );
+    });
+
+    it('should handle required validation', () => {
+      const result = validateNameField('', 'Full Name', { required: true });
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Full Name is required');
+    });
+
+    it('should trim whitespace when trim option is true', () => {
+      const result = validateNameField('  John Doe  ', 'Full Name', {
+        trim: true,
+      });
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedValue).toBe('John Doe');
+    });
+
+    it('should apply custom validation', () => {
+      const customValidator = (value: string): ValidationResult => {
+        if (value.length < 5) {
+          return { isValid: false, errors: ['Name too short'] };
+        }
+        return { isValid: true, errors: [] };
+      };
+
+      const result = validateNameField('John', 'Full Name', {
+        customValidator,
+      });
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('Name too short');
+    });
+  });
+});
+
+
+
