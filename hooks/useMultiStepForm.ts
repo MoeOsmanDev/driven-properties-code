@@ -163,17 +163,21 @@ const validateStep = (
 };
 
 /**
- * Enhanced multi-step form hook with comprehensive validation
+ * Professional multi-step form hook with proper React optimization
+ * This approach fixes the hook ordering issue while maintaining performance optimizations
  */
 export const useMultiStepForm = (
   schema: FormSchema
 ): UseMultiStepFormReturn => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({});
-  const totalSteps = schema.steps.length;
+
+  // Memoize totalSteps since schema is unlikely to change
+  const totalSteps = useMemo(() => schema.steps.length, [schema.steps.length]);
 
   /**
    * Updates a specific field in the form data
+   * Always declared - no conditional hooks
    */
   const updateField = useCallback((key: string, value: any) => {
     setFormData(prev => {
@@ -191,20 +195,22 @@ export const useMultiStepForm = (
       current[keys[keys.length - 1]] = value;
       return newData;
     });
-  }, []);
+  }, []); // No dependencies needed since we use functional updates
 
   /**
    * Validates the current step
+   * Dependencies properly specified to avoid stale closures
    */
   const validateCurrentStep = useCallback((): boolean => {
     const currentStepData = schema.steps[currentStep];
     if (!currentStepData) return false;
 
     return validateStep(currentStepData.fields, formData);
-  }, [currentStep, formData, schema]);
+  }, [currentStep, formData, schema.steps]);
 
   /**
    * Moves to the next step with validation
+   * All dependencies properly listed
    */
   const nextStep = useCallback(async (): Promise<boolean> => {
     // Don't proceed if already at the last step
@@ -224,13 +230,15 @@ export const useMultiStepForm = (
 
   /**
    * Moves to the previous step
+   * Simple function with minimal dependencies
    */
   const prevStep = useCallback(() => {
     setCurrentStep(prev => Math.max(prev - 1, 0));
-  }, []);
+  }, []); // No dependencies needed since we use functional updates
 
   /**
    * Jumps to a specific step by index
+   * Dependencies properly specified
    */
   const goToStep = useCallback(
     (stepIndex: number) => {
@@ -243,6 +251,7 @@ export const useMultiStepForm = (
 
   /**
    * Resets the form to its initial state
+   * No dependencies needed
    */
   const resetForm = useCallback(() => {
     setCurrentStep(0);
@@ -251,10 +260,11 @@ export const useMultiStepForm = (
 
   /**
    * Validates all steps and submits the form
+   * Dependencies properly specified
    */
   const submitForm = useCallback(async (): Promise<FormData | null> => {
     // Validate all steps before submission
-    const allStepsValid = schema.steps.every((step, index) =>
+    const allStepsValid = schema.steps.every(step =>
       validateStep(step.fields, formData)
     );
 
@@ -273,9 +283,10 @@ export const useMultiStepForm = (
     console.log('📊 Form Data (JSON):', JSON.stringify(formData, null, 2));
 
     return formData;
-  }, [formData, schema]);
+  }, [formData, schema.steps]);
 
-  // Computed properties
+  // Computed properties with proper dependencies
+  // These are always declared in the same order
   const isValid = useMemo(() => {
     return validateCurrentStep();
   }, [validateCurrentStep]);
@@ -293,7 +304,7 @@ export const useMultiStepForm = (
     if (currentStep !== totalSteps - 1) return false;
 
     return schema.steps.every(step => validateStep(step.fields, formData));
-  }, [currentStep, totalSteps, formData, schema]);
+  }, [currentStep, totalSteps, formData, schema.steps]);
 
   return {
     currentStep,

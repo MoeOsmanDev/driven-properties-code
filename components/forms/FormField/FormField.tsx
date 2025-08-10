@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 
 import { FieldGroup } from './inputs/FieldGroup';
 import { InputCheckbox } from './inputs/InputCheckbox';
@@ -18,20 +18,24 @@ import { FormFieldProps } from './types';
 const VALIDATION_PATTERNS = {
   email: {
     pattern: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-    message: 'Please enter a valid email address'
+    message: 'Please enter a valid email address',
   },
   phone: {
     pattern: /^[\d\s\-\+\(\)]{7,15}$/,
-    message: 'Please enter a valid phone number (7-15 digits)'
+    message: 'Please enter a valid phone number (7-15 digits)',
   },
   fullName: {
     pattern: /^[a-zA-Z\s]{2,50}$/,
-    message: 'Name must be 2-50 characters and contain only letters'
-  }
+    message: 'Name must be 2-50 characters and contain only letters',
+  },
 } as const;
 
 // Validation function
-const validateField = (field: FormFieldType, value: any, fieldPath: string): string | null => {
+const validateField = (
+  field: FormFieldType,
+  value: any,
+  fieldPath: string
+): string | null => {
   // Required validation
   if (field.required) {
     if (value === undefined || value === null || value === '') {
@@ -143,7 +147,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
     /* -------------------------
          3. Field options
      ------------------------- */
-    const fieldOptions = useMemo(() => {
+    const fieldOptions = (() => {
       // If field has static options, use them
       if (field.options) {
         return field.options;
@@ -152,6 +156,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
       // If field has optionSource, get options based on dependency value
       if (field.optionSource) {
         const dependencyValue = getValue(field.optionSource.key);
+        dependencyValue;
 
         if (
           dependencyValue &&
@@ -165,12 +170,12 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
       }
 
       return [];
-    }, [field.options, field.optionSource, formData]);
+    })();
 
     /* -------------------------
          4. Field visibility
      ------------------------- */
-    const isVisible = useMemo(() => {
+    const isVisible = (() => {
       // If no dependencies, field is always visible
       if (!field.dependencies || field.dependencies.length === 0) {
         return true;
@@ -180,10 +185,13 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
       const dependenciesMet = field.dependencies.every(dep => {
         if (dep.equals !== undefined) {
           const depValue = getValue(dep.key);
-          return depValue === dep.equals;
+          // Safe comparison - check if both values are the same type and value
+          const result = (depValue as any) === (dep.equals as any);
+          return result;
         }
         if (dep.notEmpty !== undefined) {
           const value = getValue(dep.key);
+          // Safe empty check - ensure value exists and is not empty string
           const result = dep.notEmpty
             ? value && typeof value === 'string' && value !== ''
             : true;
@@ -193,7 +201,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
       });
 
       return dependenciesMet;
-    }, [field.dependencies, formData]);
+    })();
 
     /* -------------------------
          5. Visibility check
@@ -203,7 +211,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
     /* -------------------------
          6. Enhanced change handler with validation
      ------------------------- */
-    const handleChange = useCallback((newValue: any) => {
+    const handleChange = (newValue: any) => {
       // Update the form data
       onUpdate(fieldPath, newValue);
 
@@ -213,61 +221,43 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
       // Validate the field
       const error = validateField(field, newValue, fieldPath);
       setValidationError(error);
-    }, [fieldPath, onUpdate, field]);
+    };
 
-    // Handle blur events for better UX
-    const handleBlur = useCallback(() => {
-      setHasInteracted(true);
-      const error = validateField(field, value, fieldPath);
-      setValidationError(error);
-    }, [field, value, fieldPath]);
-
-    // Clear dependent field errors when parent changes
-    const handleSelectChange = useCallback((newValue: any) => {
+    // Handle select change with dependent field clearing
+    const handleSelectChange = (newValue: any) => {
       handleChange(newValue);
 
       // Clear validation errors for dependent fields
       if (field.key === 'propertyType') {
-        // Reset dependent validation when property type changes
         setValidationError(null);
       } else if (field.key === 'category') {
-        // Reset dependent validation when category changes
         setValidationError(null);
       }
-    }, [handleChange, field.key]);
+    };
 
     /* -------------------------
          7. Render field based on type
      ------------------------- */
-    const renderField = () => {
+    const renderField = (() => {
       const hasError = hasInteracted && validationError;
-      const inputClassName = hasError ? 'border-red-500 focus:border-red-500 ring-red-300 focus:ring-red-600' : '';
 
       switch (field.type) {
         case 'text':
           return (
-            <div className="space-y-1">
-              <div className="relative">
-                <InputText
-                  id={fieldPath as string}
-                  defaultValue={(typeof value === 'string' ? value : '') as string}
-                  onCommit={handleChange as (val: string) => void}
-                  placeholder={`Enter ${field.label.toLowerCase()}` as string}
-                  autoComplete={(field.key === 'email' ? 'email' : 'off') as string}
-                />
-                <style jsx>{`
-                  input.${inputClassName} {
-                    border-color: #ef4444 !important;
-                    box-shadow: 0 0 0 1px #ef4444 !important;
-                  }
-                  input.${inputClassName}:focus {
-                    border-color: #dc2626 !important;
-                    box-shadow: 0 0 0 2px #dc262640 !important;
-                  }
-                `}</style>
-              </div>
+            <div className='space-y-1'>
+              <InputText
+                id={fieldPath as string}
+                defaultValue={
+                  (typeof value === 'string' ? value : '') as string
+                }
+                onCommit={handleChange as (val: string) => void}
+                placeholder={`Enter ${field.label.toLowerCase()}` as string}
+                autoComplete={
+                  (field.key === 'email' ? 'email' : 'off') as string
+                }
+              />
               {hasError && (
-                <p className="text-sm text-red-600 mt-1" role="alert">
+                <p className='text-sm text-red-600 mt-1' role='alert'>
                   {validationError}
                 </p>
               )}
@@ -276,7 +266,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
 
         case 'number':
           return (
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <InputNumber
                 id={fieldPath as string}
                 value={
@@ -288,7 +278,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
                 placeholder={`Enter ${field.label.toLowerCase()}` as string}
               />
               {hasError && (
-                <p className="text-sm text-red-600 mt-1" role="alert">
+                <p className='text-sm text-red-600 mt-1' role='alert'>
                   {validationError}
                 </p>
               )}
@@ -297,7 +287,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
 
         case 'select':
           return (
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <InputSelect
                 id={fieldPath as string}
                 value={(typeof value === 'string' ? value : '') as string}
@@ -306,7 +296,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
                 placeholder={`Select ${field.label.toLowerCase()}` as string}
               />
               {hasError && (
-                <p className="text-sm text-red-600 mt-1" role="alert">
+                <p className='text-sm text-red-600 mt-1' role='alert'>
                   {validationError}
                 </p>
               )}
@@ -315,7 +305,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
 
         case 'checkbox':
           return (
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <InputCheckbox
                 id={fieldPath as string}
                 label={field.label as string}
@@ -323,7 +313,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
                 onChange={handleChange as (val: boolean) => void}
               />
               {hasError && (
-                <p className="text-sm text-red-600 mt-1" role="alert">
+                <p className='text-sm text-red-600 mt-1' role='alert'>
                   {validationError}
                 </p>
               )}
@@ -332,15 +322,17 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
 
         case 'radio':
           return (
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <InputRadio
                 name={fieldPath as string}
-                selectedValue={(typeof value === 'string' ? value : '') as string}
+                selectedValue={
+                  (typeof value === 'string' ? value : '') as string
+                }
                 options={fieldOptions as string[]}
                 onChange={handleChange as (val: string) => void}
               />
               {hasError && (
-                <p className="text-sm text-red-600 mt-1" role="alert">
+                <p className='text-sm text-red-600 mt-1' role='alert'>
                   {validationError}
                 </p>
               )}
@@ -349,14 +341,14 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
 
         case 'date':
           return (
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <InputDate
                 id={fieldPath as string}
                 value={(typeof value === 'string' ? value : '') as string}
                 onChange={handleChange as (val: string) => void}
               />
               {hasError && (
-                <p className="text-sm text-red-600 mt-1" role="alert">
+                <p className='text-sm text-red-600 mt-1' role='alert'>
                   {validationError}
                 </p>
               )}
@@ -377,13 +369,13 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
         default:
           return <UnsupportedField type={field.type as string} />;
       }
-    };
+    })();
 
     /* -------------------------
        8. Render wrapper
     ------------------------- */
     if (field.type === 'group') {
-      return <div className='space-y-4'>{renderField()}</div>;
+      return <div className='space-y-4'>{renderField}</div>;
     }
 
     return (
@@ -392,7 +384,9 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
           <label
             htmlFor={fieldPath}
             className={`block text-sm font-medium leading-6 ${
-              hasInteracted && validationError ? 'text-red-700' : 'text-gray-900'
+              hasInteracted && validationError
+                ? 'text-red-700'
+                : 'text-gray-900'
             }`}
           >
             {field.label}
@@ -400,7 +394,7 @@ export const FormField: React.FC<FormFieldProps> = React.memo(
           </label>
         )}
 
-        {renderField()}
+        {renderField}
       </div>
     );
   }

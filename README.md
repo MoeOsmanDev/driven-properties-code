@@ -73,3 +73,5 @@ lib/
 
 This project shows how I can build complex forms without writing a lot of repetitive code. The JSON approach makes it easy to change the form without
 touching the React components.
+
+**Note to fix the Optimization here** it can only be fixed when we delete the useCallback from the line 214 bcz we are involking it to the next function below it as you can see, idont know how did i do it but we got to the point
