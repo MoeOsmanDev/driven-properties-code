@@ -42,7 +42,6 @@ interface StepContentProps {
  */
 export const StepContent: React.FC<StepContentProps> = React.memo(
   ({ currentStepData, currentStep, totalSteps, formData, updateField }) => {
-    console.log('StepContent rendered');
     return (
       <div className='space-y-8'>
         {/* Enhanced step header */}

@@ -54,8 +54,6 @@ export const MultiStepForm: React.FC = () => {
   //   updateField(key, value);
   // };
 
-  console.log('page rendered');
-
   return (
     <div className='w-full max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto'>
       {/* Main form container with glass morphism effect */}
